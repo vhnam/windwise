@@ -1,0 +1,17 @@
+---
+$schema: https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json
+version: "0.2"
+language: en-US
+dictionaryDefinitions:
+  - name: consumer-application
+    path: "./docs/cspell/consumer-application.txt"
+    addWords: true
+  - name: manager-dashboard
+    path: "./docs/cspell/manager-dashboard.txt"
+    addWords: true
+dictionaries:
+  - consumer-application
+  - manager-dashboard
+ignorePaths:
+  - "node_modules"
+  - "docs/cspell/**"
