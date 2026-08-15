@@ -1,0 +1,6 @@
+changeset
+changesets
+changelog
+changelogs
+gitnexus
+semver

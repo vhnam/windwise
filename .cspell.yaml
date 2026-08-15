@@ -3,6 +3,9 @@ $schema: https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell
 version: "0.2"
 language: en-US
 dictionaryDefinitions:
+  - name: workspace
+    path: "./docs/cspell/workspace.txt"
+    addWords: true
   - name: consumer-application
     path: "./docs/cspell/consumer-application.txt"
     addWords: true
@@ -10,6 +13,7 @@ dictionaryDefinitions:
     path: "./docs/cspell/manager-dashboard.txt"
     addWords: true
 dictionaries:
+  - workspace
   - consumer-application
   - manager-dashboard
 ignorePaths:
