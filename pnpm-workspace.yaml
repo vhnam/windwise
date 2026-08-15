@@ -11,6 +11,7 @@ allowBuilds:
   protobufjs: true
 
 catalog:
+  "@changesets/cli": ^2.31.0
   "@rolldown/plugin-babel": ^0.2.3
   "@t3-oss/env-core": ^0.13.11
   "@tanstack/router-cli": ^1.132.0
@@ -35,6 +36,13 @@ catalog:
 catalogMode: prefer
 
 minimumReleaseAgeExclude:
+  - "@better-auth/core"
+  - "@better-auth/drizzle-adapter"
+  - "@better-auth/kysely-adapter"
+  - "@better-auth/memory-adapter"
+  - "@better-auth/mongo-adapter"
+  - "@better-auth/prisma-adapter"
+  - "@better-auth/telemetry"
   - "@tanstack/ai"
   - "@tanstack/ai-gemini"
   - "@tanstack/react-router"
@@ -50,6 +58,9 @@ minimumReleaseAgeExclude:
   - "@tanstack/start-plugin-core"
   - "@tanstack/start-server-core"
   - "@tanstack/start-storage-context"
+  - better-auth
+  - electron-to-chromium
+  - jose
 
 onlyBuiltDependencies:
   - "@google/genai"

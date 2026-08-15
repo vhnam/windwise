@@ -430,6 +430,54 @@ co-author trailers to commit messages.
 The commit is authored by the human who requested it. Do not credit the agent in
 the message body or trailer.
 
+### Package versions (Changesets)
+
+Workspace apps and shared packages use independent SemVer via
+[Changesets](https://github.com/changesets/changesets). They are `private` and
+consumed with `workspace:*`. Do not publish to npm. Do not run
+`changeset publish`. Do not bump versions in pre-commit.
+
+| Identity        | Tool                                                           |
+| --------------- | -------------------------------------------------------------- |
+| Work item       | Spec Kit / Notion `Spec ID` (`001-project-codebase-bootstrap`) |
+| Git branch      | `feat/` `fix/` `chore/` …                                      |
+| Package version | Changesets (`@windwise/ui@0.1.0`)                              |
+
+Current baseline is `0.1.0` (initial development). Add a `.changeset/*.md` file
+when a package’s API or shipped behavior changes. Skip changesets for docs,
+specs, formatting, cspell, and agent-workflow files.
+
+Impact examples:
+
+- `patch`: fix CSS reset in `@windwise/ui` that does not add API; fix env
+  validation crash in `@windwise/consumer-application`.
+- `minor`: add Button/Input primitives to `@windwise/ui`; add a new helper
+  export to `@windwise/query`.
+- `major`: remove or rename a public export from `@windwise/ui` or
+  `@windwise/query`. During `0.y.z`, major is reserved for an incompatible API
+  change. Jumping to `1.0.0` is a product decision, not the default for every
+  breaking change in initial development — follow SemVer `0.y.z` by bumping
+  `minor` for subsequent development releases unless the changeset explicitly
+  records `major`.
+
+Multiple pending records for the same package: highest impact wins (`major` >
+`minor` > `patch`).
+
+A new workspace member MUST ship `"version": "0.1.0"` and `"private": true` in
+its `package.json` at creation; Changesets does not invent the field.
+
+To exclude a package from versioning, add its name to `.changeset/config.json`
+`ignore` and document why in the PR. Currently `ignore` is empty.
+
+```bash
+vp run changeset
+vp run changeset:version
+```
+
+`changeset version` is a release step: it consumes changeset files, updates each
+listed `package.json`, and writes `CHANGELOG.md`. Conventional Commits still
+describe the git history; they do not bump versions by themselves.
+
 ---
 
 ## 8. Claude and Cursor — Implementation Agents

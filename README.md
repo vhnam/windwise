@@ -19,10 +19,12 @@ docs/spdd/analysis/<work_item>/
 docs/spdd/prompt/<work_item>/
 ```
 
-Shared versions live in the pnpm `catalog:` in `pnpm-workspace.yaml`. Cross-app
-logic belongs in `packages/`, not copied between apps. Canonical work-item IDs
-are `<sequence>-<slug>` (see AGENTS.md); Git branches use `feat/` / `fix/` /
-`chore/` prefixes and do not have to match the work-item ID.
+Shared dependency versions live in the pnpm `catalog:` in `pnpm-workspace.yaml`.
+App and package SemVer is independent via
+[Changesets](https://github.com/changesets/changesets) (baseline `0.1.0`).
+Cross-app logic belongs in `packages/`, not copied between apps. Canonical
+work-item IDs are `<sequence>-<slug>` (see AGENTS.md); Git branches use `feat/`
+/ `fix/` / `chore/` prefixes and do not have to match the work-item ID.
 
 ## Setup
 
@@ -38,15 +40,17 @@ README) before running it.
 Run these from the repo root. Prefer `vp` over calling Vite, pnpm scripts, or
 linters directly.
 
-| Command               | What it does                                             |
-| --------------------- | -------------------------------------------------------- |
-| `vp run ready`        | Format/lint/typecheck, then test and build the workspace |
-| `vp check`            | Format, lint, and typecheck                              |
-| `vp test`             | Tests (Vitest via Vite+)                                 |
-| `vp run -r test`      | Tests in every workspace member that defines `test`      |
-| `vp run -r build`     | Production builds                                        |
-| `vp run dev:consumer` | Consumer app at http://localhost:3000                    |
-| `vp run dev:manager`  | Manager dashboard at http://localhost:4000               |
+| Command                    | What it does                                             |
+| -------------------------- | -------------------------------------------------------- |
+| `vp run ready`             | Format/lint/typecheck, then test and build the workspace |
+| `vp check`                 | Format, lint, and typecheck                              |
+| `vp test`                  | Tests (Vitest via Vite+)                                 |
+| `vp run -r test`           | Tests in every workspace member that defines `test`      |
+| `vp run -r build`          | Production builds                                        |
+| `vp run dev:consumer`      | Consumer app at http://localhost:3000                    |
+| `vp run dev:manager`       | Manager dashboard at http://localhost:4000               |
+| `vp run changeset`         | Add a changeset for packages that changed                |
+| `vp run changeset:version` | Apply changesets (bump versions, write changelogs)       |
 
 Target a package with `-C`:
 
