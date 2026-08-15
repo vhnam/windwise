@@ -1,14 +1,730 @@
+# Windwise — Agent Workflow
+
+This file is the shared operating contract for Cursor and Claude. Follow it for
+specification, decomposition, and implementation work in this repository.
+
+## Project Workflow
+
+Windwise uses a specification-first development workflow.
+
+```text
+Notion
+  ↓
+Spec Kit
+  ↓
+Open-SPDD
+  ↓
+Git / Implementation
+  ↓
+Notion
+```
+
+### Responsibility Model
+
+| Tool / System   | Primary Responsibility                                                                   |
+| --------------- | ---------------------------------------------------------------------------------------- |
+| Notion          | Product knowledge, requirements, decisions, research, roadmap, execution status          |
+| Spec Kit        | Specify and clarify product/technical requirements, then produce the implementation plan |
+| Open-SPDD       | Decompose an approved plan into executable work items, dependencies, and tickets         |
+| Claude / Cursor | Implement approved tickets, maintain code quality, tests, and repository conventions     |
+| Git             | Source control and implementation history                                                |
+
+Do not duplicate responsibilities between these systems.
+
+### Artifact Locations
+
+| Kind                    | Path                                                                     |
+| ----------------------- | ------------------------------------------------------------------------ |
+| Constitution            | `.specify/memory/constitution.md`                                        |
+| Feature specs and plans | `docs/specs/<work_item>/` (`spec.md`, `plan.md`, …)                      |
+| Open-SPDD analysis      | `docs/spdd/analysis/<work_item>/`                                        |
+| Open-SPDD prompts       | `docs/spdd/prompt/<work_item>/`                                          |
+| Spec Kit skills         | `.claude/skills/speckit-*`                                               |
+| Open-SPDD commands      | `.claude/commands/spdd-*.md`                                             |
+| Claude entry            | `CLAUDE.md` (pointer to this file; do not fork the workflow there)       |
+| Notion hub              | [Windwise](https://www.notion.so/3b5adaaeb558800eb424e4932168a6a1)       |
+| Notion Agent Workflow   | [Agent Workflow](https://www.notion.so/3bdadaaeb55881749cfce60b5ba33482) |
+| Notion Tasks            | [Tasks](https://www.notion.so/d1afe2b590614536aae67e2723d59a83)          |
+
+---
+
+## 1. Notion — Source of Truth
+
+Use Notion for:
+
+- Product requirements
+- Domain knowledge
+- Research
+- Architecture decisions
+- ADRs
+- Roadmap
+- Evaluation cases
+- Project status
+- Task / ticket tracking
+
+Notion preserves **why the product behaves a certain way** and the decisions
+behind the current implementation.
+
+---
+
+## 2. Spec Kit — Specify and Clarify
+
+Typical flow (skills in `.claude/skills/`):
+
+```text
+/speckit-specify
+/speckit-clarify
+/speckit-plan
+```
+
+Spec Kit answers:
+
+- What are we building?
+- Why are we building it?
+- What is in scope?
+- What is out of scope?
+- What behavior is expected?
+- What constraints apply?
+- What are the acceptance criteria?
+- What technical architecture or implementation approach is required?
+
+### Handoff Boundary
+
+For work items handled by Open-SPDD, Spec Kit stops after `/speckit-plan`.
+
+Do **not** run `/speckit-tasks` unless the user explicitly asks for it.
+
+The handoff inputs are:
+
+```text
+spec.md
+clarifications
+plan.md
+```
+
+---
+
+## 3. Open-SPDD — Decompose and Plan Execution
+
+Open-SPDD owns decomposition of an approved specification and plan into
+executable work.
+
+Typical commands (in `.claude/commands/`):
+
+```text
+/spdd-analysis
+/spdd-reasons-canvas
+/spdd-generate
+/spdd-prompt-update
+/spdd-sync
+```
+
+It may:
+
+- Create epics
+- Create features
+- Create implementation tasks
+- Define dependencies
+- Sequence work
+- Map tasks to requirements and acceptance criteria
+- Create or update tickets
+- Produce REASONS Canvas prompt files under `docs/spdd/prompt/<work_item>/`
+
+### Do Not Invent Product Requirements
+
+Open-SPDD must not silently introduce:
+
+- New product behavior
+- New user-facing requirements
+- New scope
+- New architecture decisions
+- New business rules
+
+When a requirement is missing or ambiguous, mark it as:
+
+```text
+SPEC GAP / OPEN QUESTION
+```
+
+and request clarification rather than inventing the answer.
+
+---
+
+## 4. Handoff: Spec Kit → Open-SPDD
+
+Expected flow:
+
+```text
+/speckit-specify
+    ↓
+/speckit-clarify
+    ↓
+/speckit-plan
+    ↓
+Human review / approval
+    ↓
+Open-SPDD (/spdd-analysis → /spdd-reasons-canvas → tickets/prompts)
+    ↓
+Epics / Features / Tasks / Dependencies
+```
+
+The approved specification and plan are the contract.
+
+Every meaningful task should be traceable to:
+
+```text
+Requirement
+  ↓
+Acceptance Criteria
+  ↓
+Implementation Task
+```
+
+---
+
+## 5. Open-SPDD → Notion Task Sync
+
+After Open-SPDD has finished decomposing an approved specification into
+executable work, review the generated task set before syncing it to Notion.
+
+The workflow is:
+
+```text
+Spec Kit
+  ↓
+Open-SPDD
+  ↓
+Review / approve task set
+  ↓
+Sync tasks to Notion Tasks database
+  ↓
+Claude / Cursor implementation
+  ↓
+Update task status in Notion
+```
+
+### Responsibility Boundary
+
+- **Open-SPDD** owns task decomposition.
+- **Notion** owns task persistence and execution status.
+- **Claude / Cursor** consume approved tasks and implement them.
+- **Git** records implementation history.
+
+Do not sync incomplete or unreviewed Open-SPDD output into the Notion task
+database.
+
+Do **not** treat `/speckit-tasks` as the default path into Notion. Spec Kit
+stops after `/speckit-plan`; Open-SPDD produces the executable work that is then
+mirrored to Notion.
+
+### Notion Task Fields
+
+Sync into the Windwise
+[Tasks](https://www.notion.so/d1afe2b590614536aae67e2723d59a83) database. Map
+fields as follows:
+
+| Contract field        | Notion property                                       |
+| --------------------- | ----------------------------------------------------- |
+| Task ID               | `Task ID`                                             |
+| Title                 | `Name`                                                |
+| Type                  | `Type` (`Epic` / `Feature` / `Task`)                  |
+| Status                | `Status` (`Todo` / `In Progress` / `Review` / `Done`) |
+| Priority              | `Priority` (`P0` / `P1` / `P2`)                       |
+| Spec ID / work item   | `Spec ID` (canonical `<sequence>-<slug>`)             |
+| Requirement reference | `Product Requirement` (relation)                      |
+| Acceptance criteria   | `Acceptance criteria`                                 |
+| Dependencies          | `Depends on` (relation to other Tasks)                |
+| Milestone / Sprint    | `Milestone` (relation to Roadmap)                     |
+| Git branch            | `Git branch`                                          |
+
+Also available on the same database: `Area`, `Owner`.
+
+The task should reference the canonical `work_item` (`Spec ID`) and Product
+Requirement rather than copying the entire specification into the task record.
+
+Keep the relationship explicit:
+
+```text
+Work Item
+  ↓
+Requirement
+  ↓
+Notion Task
+  ↓
+Git Branch / Implementation
+```
+
+When implementation is completed, update the corresponding Notion task status
+rather than creating a duplicate task.
+
+---
+
+## 6. Work Item Naming and Cross-System Identity
+
+Spec Kit, Open-SPDD, Notion, and Git use different naming conventions, but every
+non-trivial work item should share one canonical identity. Claude and Cursor
+must not invent a second project/feature identifier.
+
+### Canonical Work Item ID
+
+Use:
+
+```text
+<sequence>-<slug>
+```
+
+Examples:
+
+```text
+001-project-codebase-bootstrap
+002-ui-core-foundation
+003-instrument-catalog
+004-recommendation-engine
+005-consultation-flow
+```
+
+The canonical `work_item` value is reused across specification, Open-SPDD, and
+Notion. In this repo it is the Spec Kit directory name under `docs/specs/`.
+
+When creating a new Spec Kit feature, prefer sequential numbering and
+`--short-name`. Do **not** use timestamp prefixes as the work-item identity.
+
+### Artifact Convention
+
+Keep related artifacts grouped under the same work-item name:
+
+```text
+docs/specs/001-project-codebase-bootstrap/
+├── spec.md
+├── plan.md
+└── …
+
+docs/spdd/analysis/001-project-codebase-bootstrap/
+└── analysis.md
+
+docs/spdd/prompt/001-project-codebase-bootstrap/
+└── fix-workspace-close-bootstrap-gaps.md
+```
+
+Open-SPDD may still use a tool-local filename (for example a REASONS Canvas
+prompt name). That filename is **not** a second identity. Put the file under the
+`work_item` directory and declare `work_item` in the artifact metadata.
+
+Existing files that do not yet follow this layout should still name the same
+`work_item` in metadata rather than introducing a new ID.
+
+### Metadata
+
+Prefer explicit metadata such as:
+
+```yaml
+work_item: 001-project-codebase-bootstrap
+sequence: 001
+slug: project-codebase-bootstrap
+```
+
+`work_item` is the canonical cross-system identifier.
+
+### Git Branches Are Separate
+
+Do not force Git branch names to match the work-item ID.
+
+Example:
+
+```text
+Work item:
+001-project-codebase-bootstrap
+
+Git branch:
+chore/bootstrap-workspace
+```
+
+The Git branch follows the repository's branch naming convention (see the next
+section) while the work item remains the stable identity. Record the branch on
+the Notion task (`Git branch`) so the link stays explicit.
+
+### Notion References
+
+Notion tasks should store the canonical work item in `Spec ID`:
+
+```text
+Spec ID: 001-project-codebase-bootstrap
+```
+
+`Task ID` is allowed as the ticket-level identifier (for example `T012`). Do not
+create a second independent _feature_ identifier for the same work item.
+
+The relationship should remain:
+
+```text
+Work Item
+   │
+   ├── Spec Kit artifacts
+   ├── Open-SPDD analysis / prompts
+   ├── Notion tasks
+   └── Git branch / PR
+```
+
+### Naming Rule
+
+Do not allow each tool to independently generate an unrelated project/feature
+identifier.
+
+When creating a new non-trivial work item:
+
+1. Establish the canonical `work_item`.
+2. Use it in Spec Kit artifacts (`docs/specs/<work_item>/`).
+3. Use it in Open-SPDD artifacts (`docs/spdd/.../<work_item>/`).
+4. Reference it from Notion (`Spec ID`).
+5. Use a separately formatted Git branch that still points back to the same work
+   item.
+
+---
+
+## 7. Git Branch Naming
+
+Spec identifiers and Git branch names are different concepts.
+
+Example:
+
+```text
+Work item:
+001-project-codebase-bootstrap
+
+Git branch:
+chore/bootstrap-workspace
+```
+
+Do not force Spec Kit identifiers to match Git branch names.
+
+Use `work_item` to identify work items.
+
+Use Git branch names according to repository conventions.
+
+Preferred prefixes:
+
+```text
+feat/      New functionality
+fix/       Bug fixes
+chore/     Tooling, setup, maintenance
+refactor/  Internal refactoring
+docs/      Documentation
+test/      Test-only work
+```
+
+Examples:
+
+```text
+chore/bootstrap-workspace
+feat/ui-core-foundation
+feat/instrument-catalog
+feat/recommendation-engine
+fix/recommendation-ranking
+```
+
+### Commit messages
+
+Claude and Cursor must not add `Co-authored-by`, `Co-authored By`, or similar
+co-author trailers to commit messages.
+
+The commit is authored by the human who requested it. Do not credit the agent in
+the message body or trailer.
+
+---
+
+## 8. Claude and Cursor — Implementation Agents
+
+Claude and Cursor operate primarily at the implementation layer.
+
+Before coding:
+
+1. Read the approved specification (`docs/specs/<work_item>/spec.md`).
+2. Read the implementation plan (`docs/specs/<work_item>/plan.md`).
+3. Read the Open-SPDD ticket/task (Notion Tasks and/or
+   `docs/spdd/prompt/<work_item>/`).
+4. Inspect the existing codebase.
+5. Identify existing components, utilities, patterns, and tests.
+
+During implementation:
+
+- Implement only the approved scope.
+- Reuse existing abstractions where appropriate.
+- Preserve package boundaries.
+- Add or update tests.
+- Run relevant validation (`vp check`, `vp test`, `vp run ready` as
+  appropriate).
+- Report blockers or specification gaps instead of inventing requirements.
+
+For Open-SPDD prompts, prefer `/spdd-generate` (and `/spdd-sync` after code
+changes) rather than improvising a parallel process.
+
+### Instruction Priority
+
+When instructions conflict:
+
+```text
+Explicit user instruction
+        ↓
+Approved specification
+        ↓
+Approved implementation plan
+        ↓
+AGENTS.md / repository conventions / constitution
+        ↓
+Existing implementation patterns
+```
+
+---
+
+## 9. UI Architecture Boundary
+
+Reusable UI foundations are separated from product/domain components.
+
+```text
+packages/ui
+    ↓
+Reusable UI primitives, shared styles, and components
+
+apps/consumer-application
+    ↓
+Member-facing components and workflows
+
+apps/manager-dashboard
+    ↓
+Staff-facing components and workflows
+
+packages/domain          # when introduced
+    ↓
+Instrument and recommendation domain logic
+```
+
+`packages/ui` must not depend on Windwise business concepts.
+
+### Appropriate for `packages/ui`
+
+```text
+Button
+Input
+Field
+Dialog
+Card
+Tabs
+Badge
+```
+
+### Not appropriate for `packages/ui`
+
+```text
+InstrumentCard
+RecommendationCard
+ConsultationStep
+ProviderPriceTable
+```
+
+Domain-specific components belong in the appropriate application or domain
+package.
+
+---
+
+## 10. Recommendation Engine Boundary
+
+Windwise separates LLM behavior from recommendation logic.
+
+The LLM may:
+
+- Interpret user language into structured criteria.
+- Ask questions.
+- Explain recommendation results naturally.
+
+The LLM must not independently invent:
+
+- Instrument model names
+- Prices
+- Specifications
+- Recommendation scores
+- Catalog facts
+
+Recommendation decisions must come from structured data and deterministic
+recommendation logic.
+
+Implementation agents must preserve this boundary.
+
+---
+
+## 11. Validation and Tests
+
+Consider the following for every implementation task:
+
+- Type checking
+- Unit tests
+- Integration tests where applicable
+- Accessibility tests for UI work
+- Regression tests for recommendation logic
+- Build validation
+- Lint / formatting
+
+Run workspace validation through Vite+ (`vp`), not ad-hoc tool CLIs. See the
+Vite+ section below.
+
+For recommendation logic, prefer deterministic tests with explicit scenarios.
+
+Do not introduce heavy infrastructure without a clear requirement.
+
+---
+
+## 12. Specification Gaps
+
+When implementation reveals missing product behavior, do not silently decide it.
+
+Use:
+
+```text
+SPEC GAP
+
+Context:
+...
+
+Why it matters:
+...
+
+Possible options:
+...
+
+Required decision:
+...
+```
+
+Purely technical details that do not affect product behavior may be resolved
+using existing repository conventions.
+
+---
+
+## 13. Change Management
+
+Changes affecting any of the following should normally be treated as
+specification-level changes:
+
+- User-facing behavior
+- Product scope
+- Business rules
+- Recommendation rules
+- Data model semantics
+- Public package boundaries
+- Major architecture decisions
+
+Do not hide these changes inside implementation work.
+
+Update the appropriate specification or decision record first.
+
+---
+
+## 14. Current Project Structure
+
+Current layout (do not invent extra apps or packages):
+
+```text
+windwise/
+├── apps/
+│   ├── consumer-application/   # member-facing TanStack Start (port 3000)
+│   └── manager-dashboard/      # staff-facing TanStack Start (port 4000)
+│
+├── packages/
+│   ├── ui/                     # shared Tailwind / UI entry
+│   ├── query/                  # TanStack Query helpers
+│   └── vite-config/            # shared Vite plugin composition
+│
+├── docs/
+│   ├── specs/                  # Spec Kit feature artifacts
+│   └── spdd/                   # Open-SPDD analysis and prompts
+│
+└── .specify/                   # Spec Kit constitution, templates, workflows
+```
+
+Intended later packages (only create when an approved plan requires them):
+
+```text
+packages/domain
+packages/recommendation
+packages/validation
+packages/db
+packages/ai
+apps/api
+```
+
+This structure may evolve through approved architectural changes.
+
+Do not create packages only for theoretical future needs.
+
+---
+
+## 15. Default Workflow for New Work
+
+For a new non-trivial feature:
+
+```text
+1. Capture product intent in Notion
+2. Establish the canonical `work_item` (`<sequence>-<slug>`)
+3. Create specification with Spec Kit (/speckit-specify) under `docs/specs/<work_item>/`
+4. Clarify requirements (/speckit-clarify)
+5. Produce implementation plan (/speckit-plan)
+6. Review / approve the plan
+7. Hand off to Open-SPDD using the same `work_item`
+8. Decompose into tickets / REASONS Canvas prompts under `docs/spdd/.../<work_item>/`
+9. Review / approve the task set
+10. Sync approved tasks to the Notion Tasks database (`Spec ID` = `work_item`)
+11. Create the appropriate Git branch (prefix convention; not the work-item ID)
+12. Implement with Claude / Cursor (/spdd-generate when a prompt exists)
+13. Test and validate
+14. Review
+15. Update Notion task status / decisions
+```
+
+For small, obvious maintenance work that does not change product behavior, the
+full specification workflow may be unnecessary.
+
+Keep the process proportional to the change.
+
+---
+
+## 16. Core Principle
+
+> **Notion preserves knowledge.**
+>
+> **Spec Kit defines the contract.**
+>
+> **Open-SPDD defines the executable work.**
+>
+> **Claude and Cursor implement the approved work.**
+>
+> **Git records the implementation history.**
+
+When uncertain about which system owns a decision, prefer the system closest to
+the type of decision rather than duplicating the decision across multiple
+systems.
+
+---
+
 <!--VITE PLUS START-->
 
 # Using Vite+, the Unified Toolchain for the Web
 
-This project is using Vite+, a unified toolchain built on top of Vite, Rolldown, Vitest, tsdown, Oxlint, Oxfmt, and Vite Task. Vite+ wraps runtime management, package management, and frontend tooling in a single global CLI called `vp`. Vite+ is distinct from Vite, and it invokes Vite through `vp dev` and `vp build`. Run `vp help` to print a list of commands and `vp <command> --help` for information about a specific command.
+This project is using Vite+, a unified toolchain built on top of Vite, Rolldown,
+Vitest, tsdown, Oxlint, Oxfmt, and Vite Task. Vite+ wraps runtime management,
+package management, and frontend tooling in a single global CLI called `vp`.
+Vite+ is distinct from Vite, and it invokes Vite through `vp dev` and
+`vp build`. Run `vp help` to print a list of commands and `vp <command> --help`
+for information about a specific command.
 
-Docs are local at `node_modules/vite-plus/docs` or online at https://viteplus.dev/guide/.
+Docs are local at `node_modules/vite-plus/docs` or online at
+https://viteplus.dev/guide/.
 
 ## Built-in Commands vs Scripts
 
-`vp <name>` runs a built-in command. `vp run <name>` runs a `package.json` script or a `vite.config.ts` task. Scripts cannot overwrite built-ins, so `vp dev` and `vp run dev` may do different things. Check `package.json` and `vite.config.ts` first, and run `vp run <name>` when the project defines a script or task with that name.
+`vp <name>` runs a built-in command. `vp run <name>` runs a `package.json`
+script or a `vite.config.ts` task. Scripts cannot overwrite built-ins, so
+`vp dev` and `vp run dev` may do different things. Check `package.json` and
+`vite.config.ts` first, and run `vp run <name>` when the project defines a
+script or task with that name.
 
 ## Tool Versions
 
@@ -21,7 +737,9 @@ release. Add a tool name to select part of the graph. For example, run
 
 - [ ] Run `vp install` after pulling remote changes and before getting started.
 - [ ] Run `vp check` and `vp test` to format, lint, type check and test changes.
-- [ ] Check if there are `vite.config.ts` tasks or `package.json` scripts necessary for validation, run via `vp run <script>`.
-- [ ] If setup, runtime, or package-manager behavior looks wrong, run `vp env doctor` and include its output when asking for help.
+- [ ] Check if there are `vite.config.ts` tasks or `package.json` scripts
+      necessary for validation, run via `vp run <script>`.
+- [ ] If setup, runtime, or package-manager behavior looks wrong, run
+      `vp env doctor` and include its output when asking for help.
 
 <!--VITE PLUS END-->
