@@ -3,46 +3,64 @@ packages:
   - packages/*
   - tools/*
 
-# Apps pin @tanstack/* to "latest"; those releases are often <24h old and trip
-# pnpm 11's default minimumReleaseAge lockfile verification.
-minimumReleaseAgeExclude:
-  - '@tanstack/ai'
-  - '@tanstack/ai-gemini'
-  - '@tanstack/react-router'
-  - '@tanstack/react-start'
-  - '@tanstack/react-start-client'
-  - '@tanstack/react-start-rsc'
-  - '@tanstack/react-start-server'
-  - '@tanstack/router-cli'
-  - '@tanstack/router-core'
-  - '@tanstack/router-generator'
-  - '@tanstack/router-plugin'
-  - '@tanstack/start-client-core'
-  - '@tanstack/start-plugin-core'
-  - '@tanstack/start-server-core'
-  - '@tanstack/start-storage-context'
+allowBuilds:
+  "@google/genai": true
+  "@journeyapps/wa-sqlite": true
+  esbuild: true
+  lightningcss: true
+  protobufjs: true
 
 catalog:
-  '@types/node': ^24
-  '@vitejs/plugin-react': ^6.0.1
+  "@rolldown/plugin-babel": ^0.2.3
+  "@t3-oss/env-core": ^0.13.11
+  "@tanstack/router-cli": ^1.132.0
+  "@tailwindcss/vite": ^4.3.3
+  "@tanstack/react-query": ^5.101.4
+  "@tanstack/react-router": ^1.170.29
+  "@tanstack/react-router-ssr-query": ^1.167.1
+  "@tanstack/react-start": ^1.168.46
+  "@types/node": ^24
+  "@types/react": ^19.2.18
+  "@types/react-dom": ^19.2.4
+  "@vitejs/plugin-react": ^6.0.1
+  babel-plugin-react-compiler: ^1.0.0
+  react: ^19.2.8
+  react-dom: ^19.2.8
+  tailwindcss: ^4.3.3
   typescript: ^7.0.2
+  valibot: ^1.4.2
   vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vite-plus: 0.2.9
 
 catalogMode: prefer
 
-allowBuilds:
-  '@google/genai': true
-  '@journeyapps/wa-sqlite': true
-  esbuild: true
-  lightningcss: true
-  protobufjs: true
+minimumReleaseAgeExclude:
+  - "@tanstack/ai"
+  - "@tanstack/ai-gemini"
+  - "@tanstack/react-router"
+  - "@tanstack/react-start"
+  - "@tanstack/react-start-client"
+  - "@tanstack/react-start-rsc"
+  - "@tanstack/react-start-server"
+  - "@tanstack/router-cli"
+  - "@tanstack/router-core"
+  - "@tanstack/router-generator"
+  - "@tanstack/router-plugin"
+  - "@tanstack/start-client-core"
+  - "@tanstack/start-plugin-core"
+  - "@tanstack/start-server-core"
+  - "@tanstack/start-storage-context"
+
+onlyBuiltDependencies:
+  - "@google/genai"
+  - "@journeyapps/wa-sqlite"
+  - protobufjs
 
 overrides:
-  vite: 'catalog:'
+  vite: "catalog:"
 
 peerDependencyRules:
   allowAny:
     - vite
   allowedVersions:
-    vite: '*'
+    vite: "*"
