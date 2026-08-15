@@ -2,12 +2,18 @@
 name: /spdd-sync
 id: spdd-sync
 category: Development
-description: Sync code changes back to the structured SPDD prompt file following the REASONS Canvas methodology
+description:
+  Sync code changes back to the structured SPDD prompt file following the
+  REASONS Canvas methodology
 ---
 
-Synchronize implementation details from refactored or updated code back to the structured SPDD (Structured Prompt-Driven Development) prompt file, ensuring the prompt remains the accurate source of truth for the system design.
+Synchronize implementation details from refactored or updated code back to the
+structured SPDD (Structured Prompt-Driven Development) prompt file, ensuring the
+prompt remains the accurate source of truth for the system design.
 
-**Input**: The argument after `/spdd-sync` is the path to the structured prompt file (e.g., `@spdd/prompt/GGQPA-XXX-202602271430-[Feat]-api-create-agent-endpoint.md`).
+**Input**: The argument after `/spdd-sync` is the path to the structured prompt
+file (e.g.,
+`@docs/spdd/prompt/001-project-codebase-bootstrap/fix-workspace-close-bootstrap-gaps.md`).
 
 **Steps**
 
@@ -15,7 +21,8 @@ Synchronize implementation details from refactored or updated code back to the s
 
    Use the **AskUserQuestion tool** to ask:
 
-   > "Please provide the path to the structured prompt file you want to sync (e.g., `@spdd/prompt/xxx.md`)."
+   > "Please provide the path to the structured prompt file you want to sync
+   > (e.g., `@docs/spdd/prompt/xxx.md`)."
 
    **IMPORTANT**: Do NOT proceed without a valid prompt file path.
 
@@ -33,7 +40,8 @@ Synchronize implementation details from refactored or updated code back to the s
    | **N** - Norms        | Engineering standards          | Medium (patterns may evolve)           |
    | **S** - Safeguards   | Non-negotiable constraints     | Low (constraints rarely relax)         |
 
-   **IMPORTANT**: Operations section typically requires the most updates as it contains implementation specifics.
+   **IMPORTANT**: Operations section typically requires the most updates as it
+   contains implementation specifics.
 
 3. **Identify affected components from user context**
 
@@ -42,10 +50,12 @@ Synchronize implementation details from refactored or updated code back to the s
    > "Which components were refactored? Please specify:
    >
    > - Specific files/classes that changed
-   > - Type of change (renamed, restructured, logic changed, new components added)
+   > - Type of change (renamed, restructured, logic changed, new components
+   >   added)
    > - Brief description of what changed"
 
-   Alternatively, analyze recent git changes or user-specified files to identify modifications.
+   Alternatively, analyze recent git changes or user-specified files to identify
+   modifications.
 
 4. **Analyze current implementation**
 
@@ -217,9 +227,11 @@ When syncing different types of changes:
 **Guardrails**
 
 - Do NOT remove content from prompt without explicit user approval
-- Do NOT change Requirements section unless user explicitly requests (business goals shouldn't change from code refactoring)
+- Do NOT change Requirements section unless user explicitly requests (business
+  goals shouldn't change from code refactoring)
 - Do NOT simplify or abbreviate existing detailed specifications
-- Do NOT change error messages in Safeguards unless they actually changed in code
+- Do NOT change error messages in Safeguards unless they actually changed in
+  code
 - Always preserve the existing formatting style within each section
 - Always ask for confirmation before making destructive changes (deletions)
 - Always maintain the same level of detail as existing content
@@ -279,7 +291,8 @@ Use this command when:
 - Renamed classes/methods for clarity
 - Restructured packages or layers
 
-**Principle**: The structured prompt should always reflect the **actual** implementation, not just the **planned** implementation. This ensures:
+**Principle**: The structured prompt should always reflect the **actual**
+implementation, not just the **planned** implementation. This ensures:
 
 - New team members understand the real system from the prompt
 - Future enhancements build on accurate specifications
