@@ -1,262 +1,91 @@
-Welcome to your new TanStack Start app!
+# Consumer application
 
-# Getting Started
+Member-facing [TanStack Start](https://tanstack.com/start) app
+(`@windwise/consumer-application`). Dev server: **http://localhost:3000**.
 
-To run this application:
+Shared Query, styles, and Vite plugins come from workspace packages.
+App-specific code lives here: PowerSync, TanStack AI, env, and member-facing UI.
+Do not put Windwise domain components in `@windwise/ui`.
+
+Workflow and naming: [AGENTS.md](../../AGENTS.md).
+
+## Setup
+
+From the repo root:
 
 ```bash
-pnpm install
-pnpm dev
+vp install
+cp apps/consumer-application/.env.example apps/consumer-application/.env.local
 ```
 
-# Building For Production
-
-To build this application for production:
+Fill in `.env.local`, then:
 
 ```bash
-pnpm build
+vp run dev:consumer
 ```
 
-## Styling
-
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
-
-### Removing Tailwind CSS
-
-If you prefer not to use Tailwind CSS:
-
-1. Remove the demo pages in `src/routes/demo/`
-2. Replace the Tailwind import in `src/styles.css` with your own styles
-3. Remove `tailwindcss()` from the plugins array in `vite.config.ts`
-4. Remove `@tailwindcss/vite` and `tailwindcss` from `package.json`
-
-# TanStack Chat Application
-
-Am example chat application built with TanStack Start, TanStack Store, and Claude AI.
-
-## .env Updates
-
-```env
-ANTHROPIC_API_KEY=your_anthropic_api_key
-```
-
-## ✨ Features
-
-### AI Capabilities
-
-- 🤖 Powered by Claude 3.5 Sonnet
-- 📝 Rich markdown formatting with syntax highlighting
-- 🎯 Customizable system prompts for tailored AI behavior
-- 🔄 Real-time message updates and streaming responses (coming soon)
-
-### User Experience
-
-- 🎨 Modern UI with Tailwind CSS and Lucide icons
-- 🔍 Conversation management and history
-- 🔐 Secure API key management
-- 📋 Markdown rendering with code highlighting
-
-### Technical Features
-
-- 📦 Centralized state management with TanStack Store
-- 🔌 Extensible architecture for multiple AI providers
-- 🛠️ TypeScript for type safety
-
-## Architecture
-
-### Tech Stack
-
-- **Frontend Framework**: TanStack Start
-- **Routing**: TanStack Router
-- **State Management**: TanStack Store
-- **Styling**: Tailwind CSS
-- **AI Integration**: Anthropic's Claude API
-
-# PowerSync
-
-This project includes the PowerSync Web SDK and React hooks.
+Or from this directory: `vp dev`. Production build: `vp build`. Tests:
+`vp test`.
 
 ## Environment
 
-Set these variables in `.env.local`:
+Defined in `src/env.ts` ([T3 Env](https://env.t3.gg/) + Valibot). Import with
+`#/env`. Required variables are listed in `.env.example`.
 
-- `VITE_POWERSYNC_URL`
-- `VITE_POWERSYNC_TOKEN` for local development only
+| Variable               | Where  | Purpose                                                  |
+| ---------------------- | ------ | -------------------------------------------------------- |
+| `OPENAI_API_KEY`       | server | OpenAI / ChatGPT                                         |
+| `GEMINI_API_KEY`       | server | Gemini (`GOOGLE_API_KEY` is also accepted)               |
+| `VITE_POWERSYNC_URL`   | client | PowerSync endpoint                                       |
+| `VITE_POWERSYNC_TOKEN` | client | Dev token only; replace with real auth before production |
+| `VITE_APP_TITLE`       | client | Optional document title override                         |
+| `SERVER_URL`           | server | Optional absolute server URL                             |
 
-## What The Add-on Includes
+Create API keys (paste into `.env.local`; do not commit them):
 
-- `src/lib/powersync/AppSchema.ts`
-- `src/lib/powersync/BackendConnector.ts`
+- `OPENAI_API_KEY` — [OpenAI API keys](https://platform.openai.com/api-keys)
+  (account required; billing may apply)
+- `GEMINI_API_KEY` — [Google AI Studio](https://aistudio.google.com/apikey)
+  (Google account required). `GOOGLE_API_KEY` is accepted as an alias.
+
+## Stack
+
+- TanStack Start + file-based Router (`src/routes`)
+- TanStack Query via [`@windwise/query`](../../packages/query/README.md)
+  (`createQueryRouter` in `src/router.tsx`)
+- React Compiler, Tailwind, and Start plugins via
+  [`@windwise/vite-config`](../../packages/vite-config/README.md)
+- Base CSS from [`@windwise/ui`](../../packages/ui/README.md)
+- PowerSync (`src/lib/powersync`, `src/integrations/powersync`)
+- TanStack AI (`@tanstack/ai-openai`, `@tanstack/ai-gemini`)
+
+The Vite config also registers `powersync-vite-plugin.ts` so PowerSync workers
+resolve from the monorepo root.
+
+## PowerSync
+
+Included files:
+
+- `src/lib/powersync/app-schema.ts`
+- `src/lib/powersync/backend-connector.ts`
 - `src/integrations/powersync/provider.tsx`
-- `src/routes/demo/powersync.tsx`
 
-## Next Steps
+Before production:
 
-1. Replace the development token flow in `src/lib/powersync/BackendConnector.ts` with your real auth flow.
-2. Update the sample schema in `src/lib/powersync/AppSchema.ts` to match your synced tables.
-3. Implement the upload logic in `uploadData()` so local mutations are written back to your backend.
+1. Replace the development token flow in `backend-connector.ts` with real auth.
+2. Update `app-schema.ts` to match synced tables.
+3. Implement `uploadData()` so local mutations write back to your backend.
 
-PowerSync setup guidance:
-https://docs.powersync.com/client-sdk-references/js-web
+See [PowerSync JS Web](https://docs.powersync.com/client-sdk-references/js-web).
 
-## T3Env
+## Routing and data
 
-- You can use T3Env to add type safety to your environment variables.
-- Add Environment variables to the `src/env.mjs` file.
-- Use the environment variables in your code.
+Routes are files under `src/routes`. The shell is `src/routes/__root.tsx`.
 
-### Usage
+- Router: [TanStack Router](https://tanstack.com/router)
+- Start (server functions, SSR): [TanStack Start](https://tanstack.com/start)
+- Query SSR:
+  [Router Query integration](https://tanstack.com/router/latest/docs/integrations/query)
 
-```ts
-import { env } from "#/env";
-
-console.log(env.VITE_APP_TITLE);
-```
-
-## Routing
-
-This project uses [TanStack Router](https://tanstack.com/router) with file-based routing. Routes are managed as files in `src/routes`.
-
-### Adding A Route
-
-To add a new route to your application just add a new file in the `./src/routes` directory.
-
-TanStack will automatically generate the content of the route file for you.
-
-Now that you have two routes you can use a `Link` component to navigate between them.
-
-### Adding Links
-
-To use SPA (Single Page Application) navigation you will need to import the `Link` component from `@tanstack/react-router`.
-
-```tsx
-import { Link } from "@tanstack/react-router";
-```
-
-Then anywhere in your JSX you can use it like so:
-
-```tsx
-<Link to="/about">About</Link>
-```
-
-This will create a link that will navigate to the `/about` route.
-
-More information on the `Link` component can be found in the [Link documentation](https://tanstack.com/router/v1/docs/framework/react/api/router/linkComponent).
-
-### Using A Layout
-
-In the File Based Routing setup the layout is located in `src/routes/__root.tsx`. Anything you add to the root route will appear in all the routes. The route content will appear in the JSX where you render `{children}` in the `shellComponent`.
-
-Here is an example layout that includes a header:
-
-```tsx
-import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router";
-
-export const Route = createRootRoute({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "My App" },
-    ],
-  }),
-  shellComponent: ({ children }) => (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        <header>
-          <nav>
-            <Link to="/">Home</Link>
-            <Link to="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  ),
-});
-```
-
-More information on layouts can be found in the [Layouts documentation](https://tanstack.com/router/latest/docs/framework/react/guide/routing-concepts#layouts).
-
-## Server Functions
-
-TanStack Start provides server functions that allow you to write server-side code that seamlessly integrates with your client components.
-
-```tsx
-import { createServerFn } from "@tanstack/react-start";
-
-const getServerTime = createServerFn({
-  method: "GET",
-}).handler(async () => {
-  return new Date().toISOString();
-});
-
-// Use in a component
-function MyComponent() {
-  const [time, setTime] = useState("");
-
-  useEffect(() => {
-    getServerTime().then(setTime);
-  }, []);
-
-  return <div>Server time: {time}</div>;
-}
-```
-
-## API Routes
-
-You can create API routes by using the `server` property in your route definitions:
-
-```tsx
-import { createFileRoute } from "@tanstack/react-router";
-import { json } from "@tanstack/react-start";
-
-export const Route = createFileRoute("/api/hello")({
-  server: {
-    handlers: {
-      GET: () => json({ message: "Hello, World!" }),
-    },
-  },
-});
-```
-
-## Data Fetching
-
-There are multiple ways to fetch data in your application. You can use TanStack Query to fetch data from a server. But you can also use the `loader` functionality built into TanStack Router to load the data for a route before it's rendered.
-
-For example:
-
-```tsx
-import { createFileRoute } from "@tanstack/react-router";
-
-export const Route = createFileRoute("/people")({
-  loader: async () => {
-    const response = await fetch("https://swapi.dev/api/people");
-    return response.json();
-  },
-  component: PeopleComponent,
-});
-
-function PeopleComponent() {
-  const data = Route.useLoaderData();
-  return (
-    <ul>
-      {data.results.map((person) => (
-        <li key={person.name}>{person.name}</li>
-      ))}
-    </ul>
-  );
-}
-```
-
-Loaders simplify your data fetching logic dramatically. Check out more information in the [Loader documentation](https://tanstack.com/router/latest/docs/framework/react/guide/data-loading#loader-parameters).
-
-# Learn More
-
-You can learn more about all of the offerings from TanStack in the [TanStack documentation](https://tanstack.com).
-
-For TanStack Start specific documentation, visit [TanStack Start](https://tanstack.com/start).
+Use `context.queryClient` in loaders (`ensureQueryData` / `prefetchQuery`).
+Prefer `useSuspenseQuery` for data that should run during SSR.

@@ -1,8 +1,4 @@
-import {
-  type AbstractPowerSyncDatabase,
-  type PowerSyncBackendConnector,
-  UpdateType,
-} from "@powersync/web";
+import { type AbstractPowerSyncDatabase, type PowerSyncBackendConnector, UpdateType } from '@powersync/web';
 
 export class BackendConnector implements PowerSyncBackendConnector {
   private readonly powersyncUrl = import.meta.env.VITE_POWERSYNC_URL;
@@ -32,20 +28,20 @@ export class BackendConnector implements PowerSyncBackendConnector {
 
         switch (op.op) {
           case UpdateType.PUT:
-            console.info("TODO: create record remotely", record);
+            console.info('TODO: create record remotely', record);
             break;
           case UpdateType.PATCH:
-            console.info("TODO: patch record remotely", record);
+            console.info('TODO: patch record remotely', record);
             break;
           case UpdateType.DELETE:
-            console.info("TODO: delete record remotely", record);
+            console.info('TODO: delete record remotely', record);
             break;
         }
       }
 
       await transaction.complete();
     } catch (error) {
-      console.error("PowerSync uploadData failed", error);
+      console.error('PowerSync uploadData failed', error);
       throw error;
     }
   }
