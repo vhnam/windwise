@@ -1,0 +1,48 @@
+packages:
+  - apps/*
+  - packages/*
+  - tools/*
+
+# Apps pin @tanstack/* to "latest"; those releases are often <24h old and trip
+# pnpm 11's default minimumReleaseAge lockfile verification.
+minimumReleaseAgeExclude:
+  - '@tanstack/ai'
+  - '@tanstack/ai-gemini'
+  - '@tanstack/react-router'
+  - '@tanstack/react-start'
+  - '@tanstack/react-start-client'
+  - '@tanstack/react-start-rsc'
+  - '@tanstack/react-start-server'
+  - '@tanstack/router-cli'
+  - '@tanstack/router-core'
+  - '@tanstack/router-generator'
+  - '@tanstack/router-plugin'
+  - '@tanstack/start-client-core'
+  - '@tanstack/start-plugin-core'
+  - '@tanstack/start-server-core'
+  - '@tanstack/start-storage-context'
+
+catalog:
+  '@types/node': ^24
+  '@vitejs/plugin-react': ^6.0.1
+  typescript: ^7.0.2
+  vite: npm:@voidzero-dev/vite-plus-core@0.2.9
+  vite-plus: 0.2.9
+
+catalogMode: prefer
+
+allowBuilds:
+  '@google/genai': true
+  '@journeyapps/wa-sqlite': true
+  esbuild: true
+  lightningcss: true
+  protobufjs: true
+
+overrides:
+  vite: 'catalog:'
+
+peerDependencyRules:
+  allowAny:
+    - vite
+  allowedVersions:
+    vite: '*'
