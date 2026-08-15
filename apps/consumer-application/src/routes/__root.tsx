@@ -1,36 +1,28 @@
-import { HeadContent, Scripts, createRootRouteWithContext } from "@tanstack/react-router";
-import { TanStackRouterDevtoolsPanel } from "@tanstack/react-router-devtools";
-import { TanStackDevtools } from "@tanstack/react-devtools";
+import { createRootRouteWithContext, HeadContent, Scripts } from '@tanstack/react-router';
+import type { PropsWithChildren } from 'react';
 
-import PowerSyncProvider from "../integrations/powersync/provider";
+import type { QueryRouterContext } from '@windwise/query';
+import appCss from '@windwise/ui?url';
 
-import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
+import PowerSyncProvider from '#/integrations/powersync/provider';
 
-import appCss from "../styles.css?url";
-
-import type { QueryClient } from "@tanstack/react-query";
-
-interface MyRouterContext {
-  queryClient: QueryClient;
-}
-
-export const Route = createRootRouteWithContext<MyRouterContext>()({
+export const Route = createRootRouteWithContext<QueryRouterContext>()({
   head: () => ({
     meta: [
       {
-        charSet: "utf-8",
+        charSet: 'utf-8',
       },
       {
-        name: "viewport",
-        content: "width=device-width, initial-scale=1",
+        name: 'viewport',
+        content: 'width=device-width, initial-scale=1',
       },
       {
-        title: "TanStack Start Starter",
+        title: 'WindWise',
       },
     ],
     links: [
       {
-        rel: "stylesheet",
+        rel: 'stylesheet',
         href: appCss,
       },
     ],
@@ -38,28 +30,14 @@ export const Route = createRootRouteWithContext<MyRouterContext>()({
   shellComponent: RootDocument,
 });
 
-function RootDocument({ children }: { children: React.ReactNode }) {
+function RootDocument({ children }: PropsWithChildren) {
   return (
     <html lang="en">
       <head>
         <HeadContent />
       </head>
       <body>
-        <PowerSyncProvider>
-          {children}
-          <TanStackDevtools
-            config={{
-              position: "bottom-right",
-            }}
-            plugins={[
-              {
-                name: "Tanstack Router",
-                render: <TanStackRouterDevtoolsPanel />,
-              },
-              TanStackQueryDevtools,
-            ]}
-          />
-        </PowerSyncProvider>
+        <PowerSyncProvider>{children}</PowerSyncProvider>
         <Scripts />
       </body>
     </html>

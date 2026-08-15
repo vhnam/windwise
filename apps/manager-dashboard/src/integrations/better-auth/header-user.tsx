@@ -1,4 +1,4 @@
-import { authClient } from "#/lib/auth-client";
+import { authClient } from '#/lib/auth-client';
 
 export default function BetterAuthHeader() {
   const { data: session, isPending } = authClient.useSession();
@@ -15,7 +15,7 @@ export default function BetterAuthHeader() {
         ) : (
           <div className="h-8 w-8 bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center">
             <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
-              {session.user.name?.charAt(0).toUpperCase() || "U"}
+              {session.user.name?.charAt(0).toUpperCase() || 'U'}
             </span>
           </div>
         )}

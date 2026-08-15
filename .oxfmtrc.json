@@ -1,0 +1,96 @@
+{
+  "trailingComma": "all",
+  "printWidth": 120,
+  "tabWidth": 2,
+  "useTabs": false,
+  "semi": true,
+  "bracketSpacing": true,
+  "arrowParens": "always",
+  "overrides": [
+    {
+      "files": ["**/*.{ts,tsx,js,jsx}"],
+      "options": {
+        "singleQuote": true
+      }
+    },
+    {
+      "files": ["**/*.{md,mdx}"],
+      "options": {
+        "printWidth": 80,
+        "proseWrap": "always"
+      }
+    },
+    {
+      "files": ["apps/consumer-application/**"],
+      "options": {
+        "sortImports": {
+          "customGroups": [
+            {
+              "groupName": "windwise",
+              "elementNamePattern": ["@windwise/**"]
+            },
+            {
+              "groupName": "app",
+              "elementNamePattern": ["#/**"]
+            }
+          ],
+          "newlinesBetween": true,
+          "groups": [
+            "builtin",
+            "external",
+            "windwise",
+            "app",
+            ["parent", "sibling", "index", "style", "side_effect_style"],
+            "unknown"
+          ]
+        }
+      }
+    },
+    {
+      "files": ["apps/manager-dashboard/**"],
+      "options": {
+        "sortImports": {
+          "customGroups": [
+            {
+              "groupName": "windwise",
+              "elementNamePattern": ["@windwise/**"]
+            },
+            {
+              "groupName": "app",
+              "elementNamePattern": ["#/**"]
+            }
+          ],
+          "newlinesBetween": true,
+          "groups": [
+            "builtin",
+            ["external", "windwise"],
+            "app",
+            ["parent", "sibling", "index", "style", "side_effect_style"],
+            "unknown"
+          ]
+        }
+      }
+    }
+  ],
+  "sortImports": {
+    "customGroups": [
+      {
+        "groupName": "windwise",
+        "elementNamePattern": ["@windwise/**"]
+      },
+      {
+        "groupName": "app",
+        "elementNamePattern": ["#/**"]
+      }
+    ],
+    "newlinesBetween": true,
+    "groups": [
+      "builtin",
+      "external",
+      "windwise",
+      "app",
+      ["parent", "sibling", "index", "style", "side_effect_style"],
+      "unknown"
+    ]
+  }
+}

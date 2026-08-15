@@ -2,17 +2,22 @@
 name: /spdd-reasons-canvas
 id: spdd-reasons-canvas
 category: Development
-description: Generate REASONS-Canvas structured prompts from business context without external template
+description:
+  Generate REASONS-Canvas structured prompts from business context without
+  external template
 ---
 
-Generate implementation-ready structured prompts using the built-in REASONS-Canvas framework (Requirements, Entities, Approach, Structure, Operations, Norms, Safeguards).
+Generate implementation-ready structured prompts using the built-in
+REASONS-Canvas framework (Requirements, Entities, Approach, Structure,
+Operations, Norms, Safeguards).
 
 **Input**: Business context/requirement description after `/spdd-reasons-canvas`
 
 Input can be provided in two ways:
 
 1. **Text description**: Direct text describing the requirement
-2. **File/folder reference**: Using `@` to reference files or folders containing requirements
+2. **File/folder reference**: Using `@` to reference files or folders containing
+   requirements
 
 **Examples**:
 
@@ -34,14 +39,17 @@ Input can be provided in two ways:
 
 1. **Validate and consolidate business context**
 
-   a. **If business context is missing**, use the **AskUserQuestion tool** (open-ended, no preset options) to ask:
-   - "Please provide the business context or requirement description (you can use text, @file references, or both)"
+   a. **If business context is missing**, use the **AskUserQuestion tool**
+   (open-ended, no preset options) to ask:
+   - "Please provide the business context or requirement description (you can
+     use text, @file references, or both)"
 
    **IMPORTANT**: Do NOT proceed without business context input.
 
    b. **If input contains `@` file/folder references**:
    - Read ALL referenced files completely using the Read tool
-   - For folder references, read all relevant files within the folder (`.md`, `.txt`, `.yaml`, `.json`, etc.)
+   - For folder references, read all relevant files within the folder (`.md`,
+     `.txt`, `.yaml`, `.json`, etc.)
    - Consolidate all file contents into a unified business context
 
    c. **Combine all context sources**:
@@ -51,7 +59,8 @@ Input can be provided in two ways:
 
    **Context Integrity Check**:
    - Verify all `@` references were successfully read
-   - If any file cannot be read, report the error and ask user to provide alternative
+   - If any file cannot be read, report the error and ask user to provide
+     alternative
    - Confirm the consolidated context contains sufficient information to proceed
 
 2. **Read relevant codebase context**
@@ -62,7 +71,8 @@ Input can be provided in two ways:
 
 3. **Apply the REASONS-Canvas Framework**
 
-   Generate fully-populated content for each of the 7 stages using the built-in construction guidance:
+   Generate fully-populated content for each of the 7 stages using the built-in
+   construction guidance:
 
    ***
 
@@ -78,11 +88,13 @@ Input can be provided in two ways:
    ```
 
    **Construction Guidance**:
-   - **Essence Extraction**: Abstract what fundamental problem to solve and what value to create for whom
+   - **Essence Extraction**: Abstract what fundamental problem to solve and what
+     value to create for whom
    - **Boundary Definition**: Clarify the applicable scope and limitations
    - **Value Focus**: Highlight business value and user benefits
    - **Use Verb Phrases**: "Implement...", "Create...", "Design..."
-   - **Avoid Feature Stacking**: Don't list specific functions, abstract essential problems
+   - **Avoid Feature Stacking**: Don't list specific functions, abstract
+     essential problems
 
    **Quality Standards**:
    - Core requirements summarizable in one sentence
@@ -127,18 +139,27 @@ Input can be provided in two ways:
    ````
 
    **Construction Guidance**:
-   - **Entity Identification**: Identify core business entities, supporting entities, DTO objects
+   - **Entity Identification**: Identify core business entities, supporting
+     entities, DTO objects
    - **Attribute Modeling**: Define key attributes using "type+name" format
-   - **Relationship Modeling**: Clarify relationship types (1:1, 1:N, N:M) and business semantics
+   - **Relationship Modeling**: Clarify relationship types (1:1, 1:N, N:M) and
+     business semantics
    - **Interface Design**: Include key methods and static factory methods
    - **Data Flow**: Reflect complete flow of request→processing→response
 
    **Conservative Constraints** (CRITICAL):
-   - **Prohibit Unnecessary Refactoring**: If existing simple data types (like `List<String>`) can meet requirements, strictly prohibit creating complex entity wrappers
-   - **Existing Implementation Priority**: If current data structures can meet requirements, existing implementation must remain unchanged
-   - **Function-Driven Changes**: Only consider structural adjustments when clear functional requirements cannot be implemented through existing structures
-   - **Gradual Improvement**: Prioritize extending based on existing structures rather than rebuilding
-   - **Backward Compatibility**: Any structural changes must ensure backward compatibility
+   - **Prohibit Unnecessary Refactoring**: If existing simple data types (like
+     `List<String>`) can meet requirements, strictly prohibit creating complex
+     entity wrappers
+   - **Existing Implementation Priority**: If current data structures can meet
+     requirements, existing implementation must remain unchanged
+   - **Function-Driven Changes**: Only consider structural adjustments when
+     clear functional requirements cannot be implemented through existing
+     structures
+   - **Gradual Improvement**: Prioritize extending based on existing structures
+     rather than rebuilding
+   - **Backward Compatibility**: Any structural changes must ensure backward
+     compatibility
 
    **Quality Standards**:
    - Focus on current task flows
@@ -150,7 +171,8 @@ Input can be provided in two ways:
 
    ### A - Approach
 
-   **Objective**: Provide high-level solution strategies and architectural approaches
+   **Objective**: Provide high-level solution strategies and architectural
+   approaches
 
    **Output Format**:
 
@@ -174,8 +196,10 @@ Input can be provided in two ways:
    ```
 
    **Construction Guidance**:
-   - **Categorical Organization**: Organize by solution categories (API design, data processing, exception handling)
-   - **Architecture Decisions**: Provide key technical architecture choices and design patterns
+   - **Categorical Organization**: Organize by solution categories (API design,
+     data processing, exception handling)
+   - **Architecture Decisions**: Provide key technical architecture choices and
+     design patterns
    - **Best Practices**: Combine industry standards and experience summaries
    - **Decision Rationale**: Explain why specific solutions were chosen
    - **Risk Assessment**: Identify potential risks and response strategies
@@ -189,7 +213,8 @@ Input can be provided in two ways:
 
    ### S - Structure
 
-   **Objective**: Define technical architecture and component dependency relationships
+   **Objective**: Define technical architecture and component dependency
+   relationships
 
    **Output Format**:
 
@@ -216,11 +241,16 @@ Input can be provided in two ways:
    ```
 
    **Construction Guidance**:
-   - **Inheritance System**: Clarify inheritance relationships of interfaces, abstract classes, and implementation classes
-   - **Dependency Chain**: Define call and dependency relationships between components
-   - **Layered Design**: Reflect clear layered architecture (Controller → Service → Repository → DAO)
-   - **Responsibility Separation**: Responsibility boundaries and interaction interfaces of each layer
-   - **Extension Interfaces**: Interfaces and extension points for future functionality expansion
+   - **Inheritance System**: Clarify inheritance relationships of interfaces,
+     abstract classes, and implementation classes
+   - **Dependency Chain**: Define call and dependency relationships between
+     components
+   - **Layered Design**: Reflect clear layered architecture (Controller →
+     Service → Repository → DAO)
+   - **Responsibility Separation**: Responsibility boundaries and interaction
+     interfaces of each layer
+   - **Extension Interfaces**: Interfaces and extension points for future
+     functionality expansion
 
    **Quality Standards**:
    - Clear architectural hierarchy
@@ -231,7 +261,8 @@ Input can be provided in two ways:
 
    ### O - Operations
 
-   **Objective**: Transform abstract solutions into specific executable implementation tasks
+   **Objective**: Transform abstract solutions into specific executable
+   implementation tasks
 
    **Output Format**:
 
@@ -283,13 +314,18 @@ Input can be provided in two ways:
    ```
 
    **Construction Guidance**:
-   - **Based on First Four Stages**: Strictly based on complete context of R, E, A, S
+   - **Based on First Four Stages**: Strictly based on complete context of R, E,
+     A, S
    - **Task Classification**: Group by functional modules or component types
-   - **Implementation Details**: Include specific code specifications, configuration requirements, business logic
-   - **Execution Order**: Organize task execution order based on dependency relationships
-   - **Single Responsibility**: Each task has clear responsibilities and boundaries
+   - **Implementation Details**: Include specific code specifications,
+     configuration requirements, business logic
+   - **Execution Order**: Organize task execution order based on dependency
+     relationships
+   - **Single Responsibility**: Each task has clear responsibilities and
+     boundaries
    - **Verifiability**: Each task has clear completion criteria
-   - **Logical Rigor**: Ensure task orchestration is based on business models, avoid logical loopholes
+   - **Logical Rigor**: Ensure task orchestration is based on business models,
+     avoid logical loopholes
 
    **Quality Standards**:
    - Tasks can be executed directly
@@ -300,7 +336,8 @@ Input can be provided in two ways:
 
    ### N - Norms
 
-   **Objective**: Define unified coding standards and common implementation patterns
+   **Objective**: Define unified coding standards and common implementation
+   patterns
 
    **Output Format**:
 
@@ -323,7 +360,8 @@ Input can be provided in two ways:
    ```
 
    **Construction Guidance**:
-   - **Standardization**: Define unified coding standards and configuration patterns
+   - **Standardization**: Define unified coding standards and configuration
+     patterns
    - **Reusability**: Extract reusable common implementation patterns
    - **Consistency**: Ensure all components follow the same standards
    - **Quality Assurance**: Built-in validation and verification mechanisms
@@ -362,9 +400,12 @@ Input can be provided in two ways:
    **Construction Guidance**:
    - **Clear Boundaries**: Clearly define what can and cannot be done
    - **Verifiability**: Constraint conditions should be verifiable
-   - **Completeness**: Cover all aspects including functionality, performance, security, integration
-   - **Practicality**: Constraints should help improve code quality and system stability
-   - **Quantified Standards**: Provide quantifiable standards and metrics whenever possible
+   - **Completeness**: Cover all aspects including functionality, performance,
+     security, integration
+   - **Practicality**: Constraints should help improve code quality and system
+     stability
+   - **Quantified Standards**: Provide quantifiable standards and metrics
+     whenever possible
 
    **Quality Standards**:
    - Clear constraint conditions
@@ -395,7 +436,8 @@ Input can be provided in two ways:
    - Framework metadata (Objective, Construction Guidance, Quality Standards)
    - Generation timestamp or framework name
 
-   **ONLY include**: The structured content generated by analyzing the business context.
+   **ONLY include**: The structured content generated by analyzing the business
+   context.
 
    c. **Implementation readiness**:
    - The final prompt should be immediately actionable
@@ -405,25 +447,36 @@ Input can be provided in two ways:
 
 5. **Save the fully-populated structured prompt to file**
 
-   a. **Derive file name**: `{JIRA}-{TIMESTAMP}-[{ACTION}]-{scope}-{description}.md`
-   - **JIRA**: Extract from business context if mentioned, otherwise use `GGQPA-XXX`
-   - **TIMESTAMP**: `YYYYMMDDHHmm` (current time)
-   - **ACTION**: Infer from business context - `[Feat]`, `[Fix]`, `[Refactor]`, `[Test]`, `[Docs]`
-   - **scope**: Infer from context - `api`, `service`, `repo`, `bq`, `db`, `util` (optional)
-   - **description**: Derive from business context - kebab-case, < 10 words
+   a. **Derive path from canonical `work_item`** (`<sequence>-<slug>` from Spec
+   Kit / AGENTS.md). Do **not** invent GGQPA, JIRA, or timestamp identities.
+
+   Path: `docs/spdd/prompt/<work_item>/<action>-<description>.md`
+   - **work_item**: Canonical ID already established for this feature
+   - **action**: `feat`, `fix`, `refactor`, `test`, or `docs`
+   - **description**: kebab-case, < 10 words
+
+   Put YAML metadata at the top:
+
+   ```yaml
+   work_item: 001-project-codebase-bootstrap
+   sequence: 001
+   slug: project-codebase-bootstrap
+   ```
 
    Examples:
-   - `GGQPA-XXX-202603061530-[Feat]-api-user-registration.md`
-   - `GGQPA-169-202603061530-[Fix]-service-payment-validation.md`
+   - `docs/spdd/prompt/001-project-codebase-bootstrap/fix-workspace-close-bootstrap-gaps.md`
+   - `docs/spdd/prompt/002-ui-core-foundation/feat-button-primitive.md`
 
    b. **Create directory and write file**:
-   - Ensure directory `spdd/prompt/` exists under the project root (create if not)
-   - Write the complete, fully-populated structured prompt to `spdd/prompt/<file-name>.md`
+   - Ensure directory `docs/spdd/prompt/<work_item>/` exists under the project
+     root (create if not)
+   - Write the complete, fully-populated structured prompt to
+     `docs/spdd/prompt/<work_item>/<action>-<description>.md`
 
    c. **Show summary to user**:
 
    ```
-   ✅ REASONS-Canvas prompt generated and saved to `spdd/prompt/<file-name>.md`
+   ✅ REASONS-Canvas prompt generated and saved to `docs/spdd/prompt/<work_item>/<action>-<description>.md`
 
    📋 Generated sections:
    - Requirements: [1-line summary]
@@ -437,32 +490,48 @@ Input can be provided in two ways:
 
 6. **Ask for confirmation to proceed**
 
-   > "The REASONS-Canvas structured prompt is ready. Would you like me to proceed with the implementation?"
+   > "The REASONS-Canvas structured prompt is ready. Would you like me to
+   > proceed with the implementation?"
 
 **Output**
 
-A fully-populated, implementation-ready REASONS-Canvas structured prompt saved to `spdd/prompt/<file-name>.md`, then implementation upon user confirmation.
+A fully-populated, implementation-ready REASONS-Canvas structured prompt saved
+to `docs/spdd/prompt/<work_item>/<action>-<description>.md`, then implementation
+upon user confirmation.
 
 **Guardrails**
 
-- **CRITICAL**: Do NOT just output section headers - you MUST analyze business context and generate fully-populated content for all 7 REASONS stages
+- **CRITICAL**: Do NOT just output section headers - you MUST analyze business
+  context and generate fully-populated content for all 7 REASONS stages
 - Do NOT proceed without business context input
-- Do NOT include framework metadata (Objective, Construction Guidance, Quality Standards) in the final prompt
+- Do NOT include framework metadata (Objective, Construction Guidance, Quality
+  Standards) in the final prompt
 - Do NOT leave placeholders or TODO items - generate complete, specific content
 - Do NOT implement code before user confirms the structured prompt
-- File name MUST follow SPDD naming convention defined above
-- Use `GGQPA-XXX` if JIRA ticket number cannot be extracted from context
-- Always create `spdd/prompt/` directory if it does not exist
-- Read codebase context when needed to generate accurate entity models and implementation tasks
-- Ensure all sections are logically coherent and support the business requirement
-- Operations section MUST contain specific, executable implementation tasks with detailed method signatures and logic
-- **Conservative Entity Design**: Respect existing implementations, avoid unnecessary refactoring
+- Path MUST use the canonical `work_item`
+  (`docs/spdd/prompt/<work_item>/<action>-<description>.md`)
+- Do not invent GGQPA, JIRA, or timestamp feature identifiers
+- Always create `docs/spdd/prompt/<work_item>/` if it does not exist
+- Read codebase context when needed to generate accurate entity models and
+  implementation tasks
+- Ensure all sections are logically coherent and support the business
+  requirement
+- Operations section MUST contain specific, executable implementation tasks with
+  detailed method signatures and logic
+- **Conservative Entity Design**: Respect existing implementations, avoid
+  unnecessary refactoring
 
 **Context Integrity Guardrails**:
 
-- **MUST read ALL `@` referenced files completely** - do NOT skip or partially read any referenced file
-- **MUST read folder contents** when `@` references a folder - scan and read all relevant files
-- **Do NOT summarize or truncate** referenced file contents - preserve full information
-- **Verify all references resolved** - if any `@` reference fails to read, report error immediately
-- **Combine all sources** - merge text descriptions with file contents into unified context
-- **Preserve original intent** - do not interpret or modify the meaning of provided context
+- **MUST read ALL `@` referenced files completely** - do NOT skip or partially
+  read any referenced file
+- **MUST read folder contents** when `@` references a folder - scan and read all
+  relevant files
+- **Do NOT summarize or truncate** referenced file contents - preserve full
+  information
+- **Verify all references resolved** - if any `@` reference fails to read,
+  report error immediately
+- **Combine all sources** - merge text descriptions with file contents into
+  unified context
+- **Preserve original intent** - do not interpret or modify the meaning of
+  provided context

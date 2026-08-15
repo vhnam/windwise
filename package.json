@@ -1,15 +1,18 @@
 {
   "name": "windwise",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "ready": "vp check && vp run -r test && vp run -r build",
     "dev:consumer": "vp run consumer-application#dev",
     "dev:manager": "vp run manager-dashboard#dev",
+    "changeset": "changeset",
+    "changeset:version": "changeset version",
     "prepare": "vp config"
   },
   "devDependencies": {
+    "@changesets/cli": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
   },

@@ -1,5 +1,6 @@
 {
-  "name": "manager-dashboard",
+  "name": "@windwise/manager-dashboard",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "imports": {
@@ -9,34 +10,26 @@
     "dev": "vp dev",
     "generate-routes": "tsr generate",
     "build": "vp build",
-    "preview": "vp preview"
+    "preview": "vp preview",
+    "test": "vp test"
   },
   "dependencies": {
-    "@t3-oss/env-core": "^0.13.10",
-    "@tailwindcss/vite": "^4.1.18",
-    "@tanstack/react-devtools": "latest",
-    "@tanstack/react-query": "latest",
-    "@tanstack/react-query-devtools": "latest",
-    "@tanstack/react-router": "latest",
-    "@tanstack/react-router-devtools": "latest",
-    "@tanstack/react-router-ssr-query": "latest",
-    "@tanstack/react-start": "latest",
-    "@tanstack/react-store": "latest",
-    "@tanstack/store": "latest",
+    "@t3-oss/env-core": "catalog:",
+    "@tanstack/react-router": "catalog:",
+    "@tanstack/react-start": "catalog:",
+    "@windwise/query": "workspace:*",
+    "@windwise/ui": "workspace:*",
     "better-auth": "^1.5.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "tailwindcss": "^4.1.18",
-    "zod": "^4.3.6"
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "valibot": "catalog:"
   },
   "devDependencies": {
-    "@tanstack/devtools-event-client": "latest",
-    "@tanstack/devtools-vite": "latest",
-    "@tanstack/router-cli": "^1.132.0",
+    "@tanstack/router-cli": "catalog:",
     "@types/node": "catalog:",
-    "@types/react": "^19.2.0",
-    "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@windwise/vite-config": "workspace:*",
     "typescript": "catalog:",
     "vite": "catalog:",
     "vite-plus": "catalog:"
