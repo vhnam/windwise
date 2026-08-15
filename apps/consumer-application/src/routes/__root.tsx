@@ -2,9 +2,12 @@ import { createRootRouteWithContext, HeadContent, Scripts } from '@tanstack/reac
 import type { PropsWithChildren } from 'react';
 
 import type { QueryRouterContext } from '@windwise/query';
-import appCss from '@windwise/ui?url';
+import { Toaster } from '@windwise/ui/components/toast';
+import { ThemeProvider } from '@windwise/ui/lib/theme-provider';
 
 import PowerSyncProvider from '#/integrations/powersync/provider';
+
+import appCss from '@windwise/ui?url';
 
 export const Route = createRootRouteWithContext<QueryRouterContext>()({
   head: () => ({
@@ -32,12 +35,15 @@ export const Route = createRootRouteWithContext<QueryRouterContext>()({
 
 function RootDocument({ children }: PropsWithChildren) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        <PowerSyncProvider>{children}</PowerSyncProvider>
+        <ThemeProvider>
+          <PowerSyncProvider>{children}</PowerSyncProvider>
+          <Toaster />
+        </ThemeProvider>
         <Scripts />
       </body>
     </html>

@@ -548,6 +548,10 @@ Instrument and recommendation domain logic
 
 `packages/ui` must not depend on Windwise business concepts.
 
+shadcn/ui registry components are added only in `packages/ui`. Apps import those
+primitives from `@windwise/ui`. Do not add a `components.json` in an app or
+import `shadcn` / `@base-ui/react` outside `packages/ui`.
+
 ### Appropriate for `packages/ui`
 
 ```text

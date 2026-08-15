@@ -21,13 +21,27 @@
       }
     },
     {
-      "files": ["apps/consumer-application/**"],
+      "files": ["apps/**"],
       "options": {
         "sortImports": {
           "customGroups": [
             {
+              "groupName": "css-url",
+              "elementNamePattern": ["@windwise/ui"]
+            },
+            {
+              "groupName": "side_effect_style",
+              "selector": "side_effect_style"
+            },
+            {
               "groupName": "windwise",
-              "elementNamePattern": ["@windwise/**"]
+              "elementNamePattern": [
+                "@windwise/query",
+                "@windwise/query/**",
+                "@windwise/ui/**",
+                "@windwise/vite-config",
+                "@windwise/vite-config/**"
+              ]
             },
             {
               "groupName": "app",
@@ -40,32 +54,9 @@
             "external",
             "windwise",
             "app",
-            ["parent", "sibling", "index", "style", "side_effect_style"],
-            "unknown"
-          ]
-        }
-      }
-    },
-    {
-      "files": ["apps/manager-dashboard/**"],
-      "options": {
-        "sortImports": {
-          "customGroups": [
-            {
-              "groupName": "windwise",
-              "elementNamePattern": ["@windwise/**"]
-            },
-            {
-              "groupName": "app",
-              "elementNamePattern": ["#/**"]
-            }
-          ],
-          "newlinesBetween": true,
-          "groups": [
-            "builtin",
-            ["external", "windwise"],
-            "app",
-            ["parent", "sibling", "index", "style", "side_effect_style"],
+            "css-url",
+            ["style", "side_effect_style"],
+            ["parent", "sibling", "index"],
             "unknown"
           ]
         }
@@ -75,8 +66,22 @@
   "sortImports": {
     "customGroups": [
       {
+        "groupName": "css-url",
+        "elementNamePattern": ["@windwise/ui"]
+      },
+      {
+        "groupName": "side_effect_style",
+        "selector": "side_effect_style"
+      },
+      {
         "groupName": "windwise",
-        "elementNamePattern": ["@windwise/**"]
+        "elementNamePattern": [
+          "@windwise/query",
+          "@windwise/query/**",
+          "@windwise/ui/**",
+          "@windwise/vite-config",
+          "@windwise/vite-config/**"
+        ]
       },
       {
         "groupName": "app",
@@ -89,7 +94,9 @@
       "external",
       "windwise",
       "app",
-      ["parent", "sibling", "index", "style", "side_effect_style"],
+      "css-url",
+      ["style", "side_effect_style"],
+      ["parent", "sibling", "index"],
       "unknown"
     ]
   }

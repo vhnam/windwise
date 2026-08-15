@@ -1,7 +1,12 @@
 import { HeadContent, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
-import type { QueryRouterContext } from '@windwise/query';
-import appCss from '@windwise/ui?url';
 import type { PropsWithChildren } from 'react';
+
+import type { QueryRouterContext } from '@windwise/query';
+import { Toaster } from '@windwise/ui/components/toast';
+import { TooltipProvider } from '@windwise/ui/components/tooltip';
+import { ThemeProvider } from '@windwise/ui/lib/theme-provider';
+
+import appCss from '@windwise/ui?url';
 
 export const Route = createRootRouteWithContext<QueryRouterContext>()({
   head: () => ({
@@ -29,12 +34,15 @@ export const Route = createRootRouteWithContext<QueryRouterContext>()({
 
 function RootDocument({ children }: PropsWithChildren) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
       </head>
       <body>
-        {children}
+        <ThemeProvider>
+          <TooltipProvider>{children}</TooltipProvider>
+          <Toaster />
+        </ThemeProvider>
         <Scripts />
       </body>
     </html>
