@@ -1,5 +1,6 @@
-import { tanstackAppPlugins } from '@windwise/vite-config';
 import { defineConfig } from 'vite-plus';
+
+import { tanstackAppPlugins } from '@windwise/vite-config';
 
 const config = defineConfig({
   resolve: { tsconfigPaths: true },
