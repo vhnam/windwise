@@ -1,0 +1,38 @@
+{
+  "name": "@windwise/schemas",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#/*": "./src/*"
+  },
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./criteria": {
+      "types": "./src/criteria.ts",
+      "default": "./src/criteria.ts"
+    },
+    "./catalog": {
+      "types": "./src/catalog.ts",
+      "default": "./src/catalog.ts"
+    },
+    "./recommendation": {
+      "types": "./src/recommendation.ts",
+      "default": "./src/recommendation.ts"
+    }
+  },
+  "scripts": {
+    "test": "vp test",
+    "check": "vp check"
+  },
+  "dependencies": {
+    "valibot": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  }
+}
