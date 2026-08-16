@@ -7,6 +7,7 @@
     "ready": "vp check && vp run -r test && vp run -r build",
     "dev:consumer": "vp run consumer-application#dev",
     "dev:manager": "vp run manager-dashboard#dev",
+    "db:seed": "vp run db#db:seed",
     "changeset": "changeset",
     "changeset:version": "changeset version",
     "prepare": "vp config"

@@ -13,7 +13,7 @@ shared by chat tool input, form submission, and stored as
 
 | Field                | Type                                                                        | Required | Notes                                                      |
 | -------------------- | --------------------------------------------------------------------------- | -------- | ---------------------------------------------------------- |
-| `level`              | enum: `beginner \| 1_3_years \| advanced \| professional`                   | yes      | Maps to `level_tier` filtering                             |
+| `level`              | enum: `beginner \| intermediate \| advanced \| professional`                | yes      | Maps to `level_tier` filtering                             |
 | `purpose`            | enum: `school \| concert_band \| jazz \| orchestra \| marching \| personal` | yes      | Drives family scoring                                      |
 | `budget`             | enum: `under_20m \| 20_50m \| 50_100m \| over_100m` (VND)                   | yes      | Hard filter                                                |
 | `age`                | enum: age band                                                              | no       | Size/weight constraint input                               |

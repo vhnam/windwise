@@ -35,6 +35,7 @@ class Criteria {
     +AgeBand age
     +SectionPreference sectionPreference
     +PhysicalNote[] physicalNotes
+    +number budgetCeilingVnd
 }
 
 class InstrumentFamily {
@@ -59,6 +60,7 @@ class InstrumentModel {
     +ModelStatus status
     +Date lastVerifiedAt
     +string variantOfModelId
+    +string sourceUrl
 }
 
 class PricePoint {
@@ -75,6 +77,7 @@ class RuleSet {
 }
 
 class Rule {
+    +string id
     +RuleKind kind
     +RuleTarget target
     +ConditionAst condition
@@ -124,6 +127,7 @@ class RecommendationRun {
     +string llmModel
     +int latencyMs
     +Date createdAt
+    +NoMatchInfo noMatch
 }
 
 class RecommendationItem {
@@ -163,6 +167,39 @@ class NoMatchInfo {
     +string suggestion
 }
 
+class CatalogSnapshot {
+    +InstrumentFamily[] families
+    +InstrumentModel[] models
+    +PricePoint[] prices
+}
+
+class FormCriteriaQuestion {
+    +keyof~Criteria~ name
+    +boolean required
+    +boolean multiple
+    +string prompt
+    +string description
+    +Choice[] choices
+}
+
+class VersionPins {
+    +string ruleSetId
+    +string questionSetId
+    +string promptVersionId
+    +string engineVersion
+    +string llmModel
+    +int latencyMs
+}
+
+class PublicRecommendationItem {
+    +int rank
+    +string familyId
+    +string modelId
+    +number score
+    +ScoreBreakdown scoreBreakdown
+    +string[] reasons
+}
+
 CollectAnswersInput --> ConsultationAnswer : normalizes into
 ConsultationSession "1" --> "1" QuestionSet : pins
 ConsultationSession "1" --> "3..6" ConsultationAnswer : collects
@@ -179,21 +216,31 @@ InstrumentModel "1" --> "1" InstrumentFamily : belongs to
 RuleSet "1" --> "1..*" Rule : contains
 RecommendationRun --> RecommendationResult : maps to (top 2-3 view)
 RecommendationResult --> NoMatchInfo : includes when empty
+CatalogSnapshot --> InstrumentFamily : contains
+CatalogSnapshot --> InstrumentModel : contains
+CatalogSnapshot --> PricePoint : contains
+FormCriteriaQuestion --> Criteria : enumerates picklist keys of
+VersionPins --> RecommendationRun : captured on
+RecommendationResult --> PublicRecommendationItem : items are
 ```
 
 **Conservative constraints**: `Criteria` is not wrapped in a generic
 `FormValues`/`ChatState` type per surface — both the form and the chat tool
 produce exactly this one Valibot-defined shape, which is also the literal
-`jsonb` payload stored on `RecommendationRun.criteria`. Do not introduce a
+`jsonb` payload stored on `RecommendationRun.criteria`. Chat may additionally
+set optional `budgetCeilingVnd` (a stated VND amount used as a hard ceiling
+inside the budget band); the form never sets this field because
+`formCriteriaQuestions()` skips non-picklist schema entries. Do not introduce a
 `ConsultationDraft` entity distinct from `ConsultationAnswer[]` — draft/resume
 state is just the session's persisted answers, read back on load. Reuse
 `InstrumentFamily`, `InstrumentModel`, `PricePoint`, `RuleSet`/`Rule`,
 `QuestionSet`/`Question`, `ConsultationSession`, `ConsultationAnswer`,
 `RecommendationRun`, `RecommendationItem` exactly as defined in `data-model.md`
 — do not rename fields or add speculative columns for features 006-011; those
-work items extend these same tables later. `excludedBy` exists on
+work items extend these same tables later. Domain `InstrumentModel.sourceUrl` is
+derived at catalog-read time (not a DB column). `excludedBy` exists on
 `RecommendationItem` but must never appear in the consumer-facing
-`RecommendationResult` view (server-side filtering, not a UI-side redaction).
+`RecommendationResult` view (`PublicRecommendationItemSchema` via `v.omit`).
 
 ## Approach
 
@@ -211,56 +258,72 @@ work items extend these same tables later. `excludedBy` exists on
      identical output" true by construction (FR-007, SC-004), not by convention.
    - Chat free-text normalization (`collectAnswers`) is a distinct, separately
      testable step that runs _before_ `recommend()`, not inside it — the parity
-     guarantee covers everything from normalized `Criteria` onward; chat-only
-     normalization determinism is validated by golden-file tests on
-     `collectAnswers` output, not folded into the engine's own test suite.
+     guarantee covers everything from normalized `Criteria` onward. Default
+     implementation is `heuristicNormalize` (regex/enum mapping in
+     `@windwise/ai/src/normalize.ts`), injected as `CriteriaNormalizer`; it is
+     not an LLM call. Unmapped messages throw `UnmappedCriteriaError` rather
+     than guessing. Golden-file tests cover `heuristicNormalize` /
+     `collectAnswers` output, not the engine's own suite.
 
 2. **Technical implementation**:
-   - TanStack Start server functions (`createServerFn`) are the only callers of
-     `@windwise/db` and `@windwise/core` from the app layer — no direct DB or
-     catalog access from route components or the chat tool's client side.
-   - `@windwise/ai`'s `tools.ts` defines `collectAnswers` and
-     `recommendInstruments` as TanStack AI server-side tools; the LLM is
-     restricted to calling these two tools and rephrasing their results in
-     Vietnamese — it must never emit a model code, price, or spec not present in
-     a tool result. `output-validator.ts` scans the assistant's final text for
-     catalog-shaped tokens (model codes, currency amounts) not present in the
-     tool call result and rejects/retries the turn if found.
-   - Provider API keys (`@tanstack/ai-openai`, `@tanstack/ai-gemini`) stay in
-     server-only env vars (`apps/consumer-application/src/env.ts`, extended);
-     never exposed to the client bundle.
+   - TanStack Start server functions (`createServerFn`) and the chat POST
+     handler are the only callers of `@windwise/db` and `@windwise/core` from
+     the app layer. Server functions dynamically import `@windwise/db` /
+     `@windwise/ai` so route modules stay off the postgres client (see
+     `chat-route-client-safe.test.ts`).
+   - `@windwise/ai`'s `tools.ts` implements `collectAnswers` and
+     `recommendInstruments`; `tool-defs.ts` is the client-safe TanStack AI
+     `toolDefinition` export (`@windwise/ai/tool-defs`) used by `useChat`.
+     `createConsultationTools(db, defaultSessionId)` binds handlers. The LLM is
+     restricted to those two tools and rephrasing results in Vietnamese.
+     `output-validator.ts` scans assistant text for catalog-shaped tokens not
+     present in tool results. `handleConsultChat` appends `templatedRephrase`
+     when validation fails (fail closed); it does not currently retry a second
+     generation pass.
+   - Shared recommend-and-persist lives in `@windwise/ai`'s
+     `runRecommendation.ts` (`runRecommendation`, `submitFormConsultation`).
+     Form pins `llmModel` to `FORM_LLM_MODEL_PIN` (`'form'`); chat uses
+     `DEFAULT_LLM_MODEL` (`gpt-4.1-mini`).
+   - Provider adapter is OpenAI-only (`createConsultationAdapter` via
+     `@tanstack/ai-openai`); `OPENAI_API_KEY` is read from `process.env` in the
+     adapter (not from `apps/consumer-application/src/env.ts`). Missing key
+     throws `ProviderUnavailableError`.
    - Persistence uses `@windwise/db` (Drizzle + PostgreSQL), additive to the
      existing PowerSync client-sync scaffold, not a replacement — PowerSync
      continues to serve its current offline-sync purpose untouched.
    - Valibot (`@windwise/schemas`) is the single schema source: the same
      `Criteria` schema instance validates chat tool input, form submission, and
      is reused (not duplicated) as the Drizzle `jsonb` column's runtime shape
-     check.
+     check. Form question copy is generated by `formCriteriaQuestions()`.
 
 3. **Business logic**:
    - No-recommendation-without-required-criteria (FR-008): both `collectAnswers`
-     and the form's submit handler check `level`/`purpose`/`budget` presence
-     before ever calling `recommend()`; missing fields short-circuit into a
-     "need more info" response, never a partial or guessed result.
+     (via `missingRequiredCriteria` before `recommendInstruments`) and
+     `runRecommendation` / `submitForm` check required keys derived from
+     `CriteriaSchema` optionality (`RequiredCriteriaKeys`) before scoring;
+     missing fields throw `MissingRequiredCriteriaError`.
    - v0 rule engine (`@windwise/core/src/rules/`) is a small fixed
      constraint/modifier interpreter reading `RuleSet`/`Rule` rows shaped
      exactly like the future DB-backed model (009 swaps the data source, not the
-     interpreter). Constraints exclude candidates outright (e.g., asthma +
-     high-physical-demand family); modifiers adjust score and always attach a
-     `reason_template` that becomes a `RecommendationItem.reasons` entry.
-   - No-match handling (FR-013): when constraint rules exclude every candidate,
-     `recommend()` returns `RecommendationResult.noMatch` naming the single
-     rule/field responsible for the largest exclusion count, not a generic empty
-     result — the engine tracks per-rule exclusion counts internally to make
-     this deterministic.
-   - "Other options" (FR-006) re-slices `RecommendationItem` rows already
-     persisted for the existing `runId` (the full ranked set, not just top 3) —
-     implemented as a paginated read, never a new `recommend()` call.
+     interpreter). Before rules, `recommend()` drops unpublished models, prices
+     that do not overlap the budget band, models above `budgetCeilingVnd` when
+     set, and families that do not match `sectionPreference`. Constraints
+     exclude candidates; modifiers adjust score and attach `reasonTemplateVi`
+     into `RecommendationItem.reasons`. Ties break by `model.id` localeCompare.
+     Empty reasons get a budget/level fallback sentence.
+   - No-match handling (FR-013): when no candidates survive, `recommend()`
+     returns `RecommendationResult.noMatch` naming the `reasonKey` with the
+     highest exclusion count, or `'budget'` (with a ceiling-aware suggestion)
+     when exclusions were empty. `persistRun` stores `noMatch` on the run row.
+   - "Other options" (FR-006) re-slices persisted `recommendation_items` for the
+     existing `runId` via `getOtherOptions(runId, afterRank)` — never a new
+     `recommend()` call. The result page shows `INITIAL_VISIBLE` (3) then pages
+     `MORE_PAGE_SIZE` (3).
    - Version pinning (TR-6): `rule_set_id`, `question_set_id`,
-     `prompt_version_id`, `engine_version`, `llm_model` are captured once, at
-     `RecommendationRun` creation, from the currently-published rows/constants —
-     later catalog or rule changes never retroactively alter a persisted run's
-     rendering (FR-011, SC-005).
+     `prompt_version_id` (`consultation-prompt-v1`), `engine_version`
+     (`ENGINE_VERSION` `0.1.0`), `llm_model` are captured once at
+     `RecommendationRun` creation. `persistRun` also marks the session
+     `completed`.
 
 ## Structure
 
@@ -269,35 +332,44 @@ work items extend these same tables later. `excludedBy` exists on
 1. `Criteria` (in `@windwise/schemas`) is a Valibot `object()` schema; its
    inferred TS type (`InferOutput<typeof CriteriaSchema>`) is imported by
    `@windwise/core`, `@windwise/ai`, `@windwise/db`, and the app — one type,
-   four consumers, zero duplication.
-2. `RecommendationResult` and `RecommendationItem` (in `@windwise/schemas`) are
-   the shared return shape of `recommend()`; `@windwise/db`'s `persistRun`
-   accepts this shape directly, and the consumer app's `result/$runId.tsx` route
-   renders it directly — no per-layer DTO translation.
+   four consumers, zero duplication. `RequiredCriteriaKeys` is derived by
+   filtering `CriteriaSchema.entries` for non-optional keys (not a handwritten
+   tuple). `formCriteriaQuestions()` / `parseStoredCriteriaValue` live in
+   `criteria-form.ts` and skip non-picklist fields such as `budgetCeilingVnd`.
+2. `RecommendationResult` and `PublicRecommendationItem` (in
+   `@windwise/schemas`) are the shared return shape of `recommend()`;
+   `@windwise/db`'s `persistRun` accepts this shape directly. `runId` on the
+   engine return is empty until `persistRun` assigns it; `toPublicSlice` caps
+   the chat/form response at `PUBLIC_RESULT_LIMIT` (3) after persisting the full
+   ranked set.
 3. `RuleEffect` is a discriminated union
    (`{type: 'score', delta} | {type: 'exclude', reasonKey} | {type: 'require', reasonKey}`)
    — `@windwise/core`'s rule interpreter switches on `effect.type`; no class
-   hierarchy.
+   hierarchy. Rule AST types live in `@windwise/schemas/src/rules.ts`.
 4. `CollectAnswersOutput` and `RecommendInstrumentsInput` (in
    `@windwise/schemas`) are the two TanStack AI tool I/O contracts; both compile
    from the same `Criteria` partial/full shapes rather than being hand-written
-   twins.
+   twins. Tool JSON Schema is produced with `@valibot/to-json-schema`.
 
 ### Dependencies
 
 1. `apps/consumer-application` depends on `@windwise/schemas`, `@windwise/core`
-   (via server functions only), `@windwise/db` (via server functions only),
-   `@windwise/ai`, `@windwise/ui` (existing), `@windwise/query` (existing) — all
-   `workspace:*`.
+   (server functions only), `@windwise/db` (server functions / chat handler
+   only), `@windwise/ai`, `@windwise/ui` (existing), `@windwise/query`
+   (existing) — all `workspace:*`. Chat UI imports `@windwise/ai/tool-defs` only
+   (no DB).
 2. `@windwise/ai` depends on `@windwise/schemas` (tool I/O validation) and
-   `@windwise/core` (calls `recommend()` inside the `recommendInstruments` tool
-   handler) and `@windwise/db` (loads catalog/rule set, persists runs).
+   `@windwise/core` (calls `recommend()` inside `runRecommendation`) and
+   `@windwise/db` (loads catalog/rule set, persists runs). Also `@tanstack/ai`,
+   `@tanstack/ai-openai`, `@valibot/to-json-schema`.
 3. `@windwise/core` depends only on `@windwise/schemas` (types) — no React, no
    TanStack, no DB driver. This is enforced, not just documented (oxlint
-   boundary rule).
+   `no-restricted-imports` override in workspace `vite.config.ts` scoped to
+   `packages/core/src/**`).
 4. `@windwise/db` depends on `@windwise/schemas` (runtime validation of jsonb
-   columns) and `drizzle-orm` + `postgres`/`pg` driver — new dependencies,
-   scoped to this package only.
+   columns) and `drizzle-orm` + `postgres` driver — new dependencies, scoped to
+   this package only. Env for `DATABASE_URL` is `@windwise/db`'s `src/env.ts`
+   (`@t3-oss/env-core`).
 5. `apps/manager-dashboard` is untouched by this work item but is documented as
    a future consumer of `@windwise/core` directly (009's Test Recommendation
    tool) — do not add manager-dashboard routes here.
@@ -306,20 +378,26 @@ work items extend these same tables later. `excludedBy` exists on
 
 ### Layered Architecture
 
-1. **Route layer** (`apps/consumer-application/src/routes/consult/`,
-   `.../form/`, `.../result/$runId.tsx`): React components, TanStack Router
-   loaders, calls server functions only — no direct DB/engine imports.
-2. **Server function layer** (colocated `.server.ts` or inline `createServerFn`
-   in route files): thin glue — validates via `@windwise/schemas`, calls
-   `@windwise/core`/`@windwise/db`, returns plain serializable data.
-3. **AI tool layer** (`@windwise/ai`): TanStack AI tool definitions bound to the
-   same server function logic; owns the output validator; the only layer allowed
-   to talk to the LLM provider SDKs.
-4. **Engine layer** (`@windwise/core`): pure `recommend()` and the rule
-   interpreter; framework-free, fully unit-testable in isolation.
-5. **Data layer** (`@windwise/db`): Drizzle schema, migrations, and query
-   modules (`getSessionState`, `saveAnswers`, `persistRun`, `getRun`,
-   `listPublishedCatalog`); the only layer that opens a DB connection.
+1. **Route layer** (`apps/consumer-application/src/routes/`): thin TanStack
+   Router files. Product UI lives in `src/modules/home-page`,
+   `src/modules/form-page`, `src/modules/result-page`. Routes: `/`, `/consult/`,
+   `/form/`, `/result/$runId`, `POST /api/consult/chat`.
+2. **Server function layer** (`src/lib/server/consultation.ts`):
+   `createServerFn` wrappers (`startConsultation`, `submitForm`,
+   `getSharedResult`, `getOtherOptions`, `getSessionCriteria`). Chat stream
+   lives in `src/lib/server/consult-chat.ts` (`handleConsultChat`).
+3. **AI tool layer** (`@windwise/ai`): tool defs, handlers, heuristic
+   normalizer, output validator, OpenAI adapter, versioned system prompt
+   (`prompts/v1.ts`). Owns `runRecommendation`.
+4. **Engine layer** (`@windwise/core`): pure `recommend()`, `toPublicSlice`,
+   `ENGINE_VERSION`, and the rule interpreter; framework-free.
+5. **Data layer** (`@windwise/db`): Drizzle schema, migrations, seed, and query
+   modules (`getSessionState`, `createSession`, `saveAnswers`,
+   `getPublishedCatalog`, `getPublishedRuleSet`, `getPublishedQuestionSetId`,
+   `persistRun`, `getRun`).
+6. **UI primitives** (`@windwise/ui`): generic `Questionnaire` (shadcn
+   questionnaire wrapper) plus existing `Button`/`Card`/`Badge`/`Field`. No
+   instrument/recommendation-named components.
 
 ## Operations
 
@@ -343,24 +421,48 @@ routes/UI → tests/changesets.
 1. Responsibility: Define `CriteriaSchema` and its inferred `Criteria` type per
    data-model.md's field table.
 2. Definitions:
-   - `LevelSchema = v.picklist(['beginner', '1_3_years', 'advanced', 'professional'])`
+   - `LevelSchema = v.picklist(['beginner', 'intermediate', 'advanced', 'professional'])`
    - `PurposeSchema = v.picklist(['school', 'concert_band', 'jazz', 'orchestra', 'marching', 'personal'])`
    - `BudgetSchema = v.picklist(['under_20m', '20_50m', '50_100m', 'over_100m'])`
    - `AgeBandSchema`, `SectionPreferenceSchema`, `PhysicalNoteSchema` per
      data-model.md
-   - `CriteriaSchema = v.object({ level: LevelSchema, purpose: PurposeSchema, budget: BudgetSchema, age: v.optional(AgeBandSchema), sectionPreference: v.optional(SectionPreferenceSchema), physicalNotes: v.optional(v.array(PhysicalNoteSchema)) })`
-   - `RequiredCriteriaKeysSchema` exported as a const tuple
-     `['level', 'purpose', 'budget']` so both surfaces check the same list.
+   - `CriteriaSchema = v.object({ level: LevelSchema, purpose: PurposeSchema, budget: BudgetSchema, age: v.optional(AgeBandSchema), sectionPreference: v.optional(SectionPreferenceSchema), physicalNotes: v.optional(v.array(PhysicalNoteSchema)), budgetCeilingVnd: v.optional(v.number()) })`
+   - `RequiredCriteriaKeys` is derived
+     (`CriteriaKeys.filter(isRequiredCriteriaKey)`), not a handwritten tuple —
+     currently `['level', 'purpose', 'budget']`.
+   - `missingRequiredCriteria(partial)` returns missing required keys.
+   - Helpers: `criteria-inspect.ts` (`unwrapCriteriaSchema`,
+     `isOptionalCriteriaSchema`, `isArrayCriteriaSchema`,
+     `criteriaPicklistOptions`).
 3. Constraints: enum values are the literal strings from data-model.md — do not
-   rename or add values not present there.
+   rename or add picklist values not present there. `budgetCeilingVnd` is
+   chat-only and is not a picklist.
 
 ### Create Schema - `packages/schemas/src/catalog.ts`
 
 1. Responsibility: Define read-side catalog shapes (`InstrumentFamily`,
    `InstrumentModel`, `PricePoint`) matching data-model.md exactly, for use as
    `@windwise/core`'s input types and `@windwise/db`'s row-to-domain mapping.
+   Includes `CatalogSnapshotSchema` and `sourceUrl` on `InstrumentModel` (domain
+   field; catalog query synthesizes it from `modelCode`).
 2. Constraints: field names/types match data-model.md tables verbatim; no extra
-   speculative fields for 006-011.
+   speculative fields for 006-011 except `sourceUrl` on the read-side model
+   shape (not a Drizzle column).
+
+### Create Schema - `packages/schemas/src/rules.ts`
+
+1. Responsibility: `ConditionAst`, `RuleEffect`, `Rule`, `RuleSet` Valibot
+   schemas shared by core and db row mapping.
+2. Constraints: operator set is the fixed AST (`equals`, `in`, `includes`,
+   `gte`, `lte`, `and`, `or`); `Rule.id` is required.
+
+### Create Schema - `packages/schemas/src/criteria-form.ts`
+
+1. Responsibility: Vietnamese form copy and `formCriteriaQuestions()` /
+   `parseStoredCriteriaValue` used by the form page, result chips, and
+   `answersToCriteria`.
+2. Constraints: only picklist (and picklist-array) criteria keys become
+   questions; `budgetCeilingVnd` is omitted from the form.
 
 ### Create Schema - `packages/schemas/src/recommendation.ts`
 
@@ -377,9 +479,10 @@ routes/UI → tests/changesets.
 1. Responsibility: New workspace member owning Drizzle schema, migrations, and
    query modules against PostgreSQL.
 2. Files: `package.json` (`"name": "@windwise/db"`,
-   `dependencies: drizzle-orm, postgres`, `devDependencies: drizzle-kit`),
-   `drizzle.config.ts`, `src/schema/` , `src/queries/`, `src/client.ts` (creates
-   the pooled connection from `DATABASE_URL` env var).
+   `dependencies: drizzle-orm, postgres, @t3-oss/env-core, valibot, @windwise/schemas`,
+   `devDependencies: drizzle-kit`), `drizzle.config.ts`, `src/schema/` ,
+   `src/queries/`, `src/client.ts` (`createDb` / `getDb` pooled connection from
+   `DATABASE_URL`), `src/env.ts`, `src/seed.ts`, `src/seed-cli.ts`.
 3. Constraints: connection string read via `@t3-oss/env-core` validated env,
    server-only; package must not be imported from any client-bundled route
    component.
@@ -396,11 +499,13 @@ routes/UI → tests/changesets.
 
 1. Responsibility: Drizzle table definitions for `question_sets`, `questions`,
    `consultation_sessions`, `consultation_answers`, `recommendation_runs`,
-   `recommendation_items`, `rule_sets`, `rules`.
+   `recommendation_items`, `rule_sets`, `rules`. `recommendation_runs.no_match`
+   is optional jsonb. Primary key on answers is `(session_id, question_key)`.
 2. Constraints: `consultation_sessions.anon_id` is the only session-identifying
    column — no name/email/phone columns anywhere in this schema (FR-012).
    `recommendation_runs` is never updated after insert (immutable-by-convention;
-   no `updated_at` column).
+   no `updated_at` column). Session `status`/`completed_at` may be updated when
+   a run is persisted.
 
 ### Create Migration + Seed - `packages/db/src/seed.ts`
 
@@ -418,20 +523,24 @@ routes/UI → tests/changesets.
 2. Methods:
    - `getSessionState(sessionId): Promise<{session, answers}>` — loads a session
      and its answers for resume (edge case: abandon-and-return).
-   - `createSession(input: {questionSetId, intent, locale}): Promise<ConsultationSession>`
-     — pins `question_set_id` at creation.
-   - `saveAnswers(sessionId, answers: ConsultationAnswer[]): Promise<void>` —
-     upserts by `(sessionId, questionKey)` so re-answering a field overwrites
+   - `createSession(db, input: {questionSetId, intent, locale, anonId?}): Promise<ConsultationSessionRecord>`
+     — pins `question_set_id` at creation; generates ids if omitted.
+   - `saveAnswers(db, sessionId, answers: ConsultationAnswerRecord[]): Promise<void>`
+     — upserts by `(sessionId, questionKey)` so re-answering a field overwrites
      rather than duplicates.
-   - `getPublishedCatalog(): Promise<{families, models, prices}>` — reads only
-     `status = 'published'` models.
-   - `getPublishedRuleSet(): Promise<RuleSet>` — reads the single
-     `status = 'published'` rule set row plus its rules.
-   - `persistRun(run: RecommendationResult, pins: VersionPins): Promise<{runId}>`
-     — inserts one `recommendation_runs` row and all `recommendation_items` rows
-     in one transaction.
-   - `getRun(runId): Promise<{run, items}>` — used by both the shareable result
-     page and "other options" pagination.
+   - `getPublishedCatalog(db): Promise<CatalogSnapshot>` — reads only
+     `status = 'published'` models; synthesizes `sourceUrl`; throws
+     `NoPublishedCatalogError` when empty.
+   - `getPublishedQuestionSetId(db): Promise<string>` — first published question
+     set.
+   - `getPublishedRuleSet(db): Promise<RuleSet>` — published rule set plus
+     rules; throws `NoPublishedRuleSetError`.
+   - `persistRun(db, result: RecommendationResult, pins: VersionPins & {sessionId, criteria}): Promise<{runId}>`
+     — inserts one `recommendation_runs` row (including `noMatch`) and all
+     `recommendation_items` rows in one transaction, then marks the session
+     `completed`.
+   - `getRun(db, runId): Promise<{run, items}>` — used by both the shareable
+     result page and "other options" pagination.
 3. Constraints: every method is a plain async function (no class), takes a
    Drizzle client instance as an injected first-class dependency for
    testability.
@@ -440,35 +549,39 @@ routes/UI → tests/changesets.
 
 1. Responsibility: New workspace member for the pure recommendation engine.
 2. Files: `package.json` (`"name": "@windwise/core"`, dependency on
-   `@windwise/schemas` only), `src/recommend.ts`, `src/rules/`,
-   `src/ __tests__/`.
+   `@windwise/schemas` only), `src/recommend.ts`, `src/rules/interpreter.ts`,
+   `src/__tests__/`.
 3. Constraints: zero dependency on `react`, `@tanstack/*`, `drizzle-orm`, or any
-   DB driver — verified by an oxlint `no-restricted-imports` rule scoped to
-   `packages/core/src/**`.
+   DB driver — verified by oxlint `no-restricted-imports` in workspace
+   `vite.config.ts` scoped to `packages/core/src/**`.
 
 ### Create Function - `packages/core/src/recommend.ts`
 
 1. Responsibility: The single pure computation this whole feature exists to
    guarantee is called identically from both surfaces.
 2. Signature:
-   `recommend(criteria: Criteria, catalog: {families, models, prices}, ruleSet: RuleSet): RecommendationResult`
+   `recommend(criteria: Criteria, catalog: CatalogSnapshot, ruleSet: RuleSet): RecommendationResult`
+   plus `toPublicSlice(result, limit = 3)` and `ENGINE_VERSION = '0.1.0'`.
 3. Logic:
    - Filter `models` to `status === 'published'`.
-   - For each candidate model, evaluate every `constraint` rule in `ruleSet`; if
-     a `constraint` rule's condition matches and its effect is `exclude`, drop
-     the candidate and increment an internal `exclusionCounts[reasonKey]`
-     counter.
+   - Drop candidates without a current price, whose price does not overlap the
+     budget band, whose `amountMin` exceeds `budgetCeilingVnd` when set, or
+     whose family does not match `sectionPreference` (`undecided`/absent = pass;
+     otherwise family `section` or `slug`).
+   - For each remaining candidate, evaluate every `constraint` rule; skip rules
+     whose condition references absent optional criteria
+     (`conditionReferencesAbsentCriteria`). If a matching constraint effect is
+     `exclude`/`require`, drop the candidate and increment
+     `exclusionCounts[reasonKey]`.
    - For surviving candidates, evaluate every `modifier` rule; apply
-     `score.delta` and push `reason_template_{vi,en}` rendered against
-     `criteria` into that item's `reasons`.
-   - Sort remaining candidates by score descending; assign `rank` 1..N over the
-     _full_ surviving set (not just top 3) so "other options" has something to
-     slice into.
-   - If the surviving set is empty, compute `noMatch.limitingConstraint` as the
-     `reasonKey` with the highest `exclusionCounts` value and populate
-     `noMatch.suggestion` from that rule's `reason_template`.
-   - Return
-     `{ items: rankedItems, noMatch: rankedItems.length === 0 ? noMatchInfo : undefined }`.
+     `score.delta` and push rendered `reasonTemplateVi` into `reasons`. Starting
+     score is `BASE_SCORE` (50). If no modifier reasons, attach a budget/level
+     fallback sentence.
+   - Sort remaining candidates by score descending, then `model.id`; assign
+     `rank` 1..N over the _full_ surviving set.
+   - If empty, `noMatch.limitingConstraint` is the highest-count `reasonKey`,
+     else `'budget'` with a ceiling-aware or generic suggestion.
+   - Return `{ runId: '', items, noMatch }`. Callers persist then slice.
 4. Constraints: deterministic — no `Date.now()`, no randomness, no I/O; same
    `(criteria, catalog, ruleSet)` input always produces byte-identical output
    (this determinism is what SC-004's integration test asserts). Absent optional
@@ -480,10 +593,13 @@ routes/UI → tests/changesets.
 1. Responsibility: Evaluate a single `Rule.condition` (fixed-operator AST)
    against a candidate + criteria pair.
 2. Methods:
-   - `evaluateCondition(condition: ConditionAst, ctx: {criteria, family, model}): boolean`
+   - `evaluateCondition(condition: ConditionAst, ctx: EvaluationContext): boolean`
      — supports a small fixed operator set (`equals`, `in`, `includes`, `gte`,
      `lte`, `and`, `or`) sufficient for the v0 rule list in research.md §2; do
-     not build a general expression language.
+     not build a general expression language. Fields are dotted (`criteria.*`,
+     `family.*`, `model.*`).
+   - `conditionReferencesAbsentCriteria(condition, criteria): boolean` — skip
+     rules that mention optional criteria not present.
    - `applyEffect(effect: RuleEffect, item: WorkingItem): WorkingItem` —
      switches on `effect.type` (`score` adds `delta` to running score;
      `exclude`/`require` mark the item excluded with `reasonKey`).
@@ -499,7 +615,8 @@ routes/UI → tests/changesets.
    purpose → steered toward woodwind (US1.2's named example); all-criteria
    excluded → `noMatch` names the correct limiting constraint; identical input
    called twice → byte-identical output (determinism check); required-only +
-   zero-optional submission → still produces 2-3 items.
+   zero-optional submission → still produces 2-3 items; `budgetCeilingVnd` below
+   catalog starting prices → `noMatch` with `limitingConstraint: 'budget'`.
 3. Constraints: `vite-plus/test`
    (`import { describe, expect, it } from 'vite-plus/test'`); fixtures are small
    hand-built catalog/rule-set objects colocated in `__tests__/fixtures.ts`, not
@@ -510,56 +627,74 @@ routes/UI → tests/changesets.
 1. Responsibility: New workspace member for TanStack AI tool definitions and the
    anti-hallucination output validator.
 2. Files: `package.json` (`"name": "@windwise/ai"`, deps on `@windwise/schemas`,
-   `@windwise/core`, `@windwise/db`, `@tanstack/ai`), `src/tools.ts`,
-   `src/output-validator.ts`, `src/prompts/` (versioned system prompt text,
-   matching `prompt_version_id`).
-3. Constraints: this package's tool handlers are the only place LLM provider
-   calls and DB/engine calls are wired together — no duplicate wiring in the app
-   layer.
+   `@windwise/core`, `@windwise/db`, `@tanstack/ai`, `@tanstack/ai-openai`,
+   `@valibot/to-json-schema`, `valibot`), exports `.` and `./tool-defs`,
+   `src/tools.ts`, `src/tool-defs.ts`, `src/run-recommendation.ts`,
+   `src/answers.ts`, `src/normalize.ts`, `src/adapter.ts`, `src/errors.ts`,
+   `src/constants.ts`, `src/output-validator.ts`, `src/prompts/v1.ts`.
+3. Constraints: this package's `runRecommendation` is the only place DB +
+   engine + persist are sequenced. Tool defs (`./tool-defs`) must stay
+   importable from the client chat route without pulling postgres.
 
 ### Create Tool - `packages/ai/src/tools.ts` — `collectAnswers`
 
 1. Responsibility: Normalize a chat message into structured `Criteria` field
    updates, server-side only.
 2. Signature:
-   `collectAnswers(input: {sessionId: string, message: string}): Promise<CollectAnswersOutput>`
+   `collectAnswers(db, input: {sessionId: string, message: string}, normalize: CriteriaNormalizer = heuristicNormalize): Promise<CollectAnswersOutput>`
 3. Logic:
-   - Load current session answers via `getSessionState`.
-   - Call the LLM (constrained prompt) to map free text to one or more
-     `Criteria` field values from the fixed enum sets in `@windwise/schemas` —
-     reject/discard any LLM output value not a member of the target field's enum
-     (anti-hallucination: normalization output is schema-validated, not trusted
-     verbatim).
+   - Load current session answers via `getSessionState`; throw if unknown
+     session.
+   - Call `normalize(message)` (default `heuristicNormalize`) to map free text
+     to enum/ceiling fields. Discard values not in the target enum by
+     construction of the hint tables. Throw `UnmappedCriteriaError` when nothing
+     maps.
    - Persist newly normalized answers via `saveAnswers` with `source: 'chat'`
-     and both `rawValue` (original text) and `normalizedValue`.
-   - Compute `missingRequired` by diffing collected keys against
-     `RequiredCriteriaKeysSchema`.
+     (`criteriaToAnswers`) including `rawValue` (original text) and
+     `normalizedValue`.
+   - Merge with existing answers (`mergeCriteria` / `answersToCriteria`).
+   - Compute `missingRequired` via `missingRequiredCriteria`.
    - Return `{criteria: partialCriteria, missingRequired}`.
 4. Constraints: never calls `recommend()`; this tool only updates criteria
-   state. Must reject and re-prompt (not guess) when free text does not map
-   cleanly to any enum value for a field.
+   state. Default path does not call an LLM.
+
+### Create Module - `packages/ai/src/normalize.ts` — `heuristicNormalize`
+
+1. Responsibility: Deterministic Vietnamese/English regex mapping onto
+   `PartialCriteria`, including `budgetCeilingVnd` from stated "N triệu" amounts
+   and band inference.
+2. Constraints: must throw `UnmappedCriteriaError` when no field maps; mixed
+   brass+woodwind section hints collapse to `undecided`.
+
+### Create Module - `packages/ai/src/answers.ts`
+
+1. Responsibility: `criteriaToAnswers`, `answersToCriteria`, `mergeCriteria`
+   bridging session rows and `PartialCriteria` via `parseStoredCriteriaValue`.
 
 ### Create Tool - `packages/ai/src/tools.ts` — `recommendInstruments`
 
 1. Responsibility: The chat-side entry point into the shared engine.
 2. Signature:
-   `recommendInstruments(input: {sessionId: string}): Promise<RecommendationResult>`
+   `recommendInstruments(db, input: {sessionId: string}, llmModel = DEFAULT_LLM_MODEL): Promise<RecommendationResult>`
 3. Logic:
-   - Load session answers via `getSessionState`; assemble full `Criteria`.
-   - Validate against `CriteriaSchema`; if `level`/`purpose`/`budget` missing,
-     throw a typed `MissingRequiredCriteriaError` (caught by the tool wrapper,
-     surfaced to the LLM as "ask for X" instruction, never silently producing a
-     partial result) — mirrors FR-008 for the chat surface.
-   - Load `getPublishedCatalog()` and `getPublishedRuleSet()`.
-   - Call `@windwise/core`'s `recommend(criteria, catalog, ruleSet)`.
-   - Persist via `persistRun` with version pins (`ruleSetId`, `questionSetId`,
-     `promptVersionId`, `engineVersion` from a package-level constant,
-     `llmModel` from the active provider config).
-   - Return the public-view `RecommendationResult` (top 2-3 items; full ranked
-     set persisted but only top slice returned here — "other options" is a
-     separate read).
-4. Constraints: this is the _only_ place `recommend()` is called from the chat
-   surface — no inline scoring logic duplicated in the tool handler.
+   - Load session answers via `getSessionState`; assemble `Criteria`.
+   - If `missingRequiredCriteria` is non-empty, throw
+     `MissingRequiredCriteriaError`.
+   - Delegate to `runRecommendation(db, criteria, sessionId, llmModel)`.
+4. Constraints: this is the _only_ place the chat surface reaches `recommend()`
+   — no inline scoring in the tool handler. `createConsultationTools` fills
+   empty `sessionId` from the chat URL default.
+
+### Create Function - `packages/ai/src/run-recommendation.ts`
+
+1. Responsibility: Shared recommend-and-persist sequence for chat and form.
+2. Methods:
+   - `runRecommendation(db, criteria, sessionId, llmModel)` — parse
+     `CriteriaSchema`, load catalog + rule set, time `recommend()`, `persistRun`
+     with pins (`PROMPT_VERSION_ID`, `ENGINE_VERSION`, `llmModel`, `latencyMs`),
+     return `toPublicSlice(..., PUBLIC_RESULT_LIMIT)`.
+   - `submitFormConsultation(db, criteria, sessionId)` — `saveAnswers` with
+     `source: 'form'`, then `runRecommendation` with `FORM_LLM_MODEL_PIN`.
 
 ### Create Module - `packages/ai/src/output-validator.ts`
 
@@ -571,74 +706,89 @@ routes/UI → tests/changesets.
      model-code patterns) from `text`; flags any token not traceable to a value
      present in `toolResults`.
    - Returns `{ok: true} | {ok: false, flaggedTokens: string[]}`.
-3. Logic: on `ok: false`, the calling chat handler must retry generation with an
-   explicit "only restate tool results" instruction once, then fall back to a
-   templated rephrase of the raw tool result if the retry still fails — never
-   surface a flagged response to the visitor.
+3. Logic: on `ok: false`, `handleConsultChat` appends
+   `templatedRephrase(toolResults)` to the SSE stream rather than surfacing the
+   flagged tokens as the sole answer. There is no second LLM retry pass in the
+   current implementation.
 4. Constraints: pattern-matching only (no second LLM call to "judge" the first,
-   to avoid unbounded latency/cost); false positives fail closed (block and
-   retry), not open.
+   to avoid unbounded latency/cost); false positives fail closed (append
+   `templatedRephrase`, do not show unverified catalog tokens).
+
+### Create Route - `apps/consumer-application/src/routes/index.tsx`
+
+1. Responsibility: Member landing (`HomePage` in `src/modules/home-page`) with
+   two entry points: `/consult` and `/form`. Undraw illustrations colocated
+   under `modules/home-page/illustrations/`.
 
 ### Create Route - `apps/consumer-application/src/routes/consult/index.tsx`
 
-1. Responsibility: Chat entry point using `@tanstack/ai-react`'s `useChat` wired
-   to the `@windwise/ai` tool set.
-2. Logic: creates/resumes a `ConsultationSession` (via a server function calling
-   `createSession`/`getSessionState`) on mount; renders the chat transcript
-   using existing `@windwise/ui` primitives (`card`, `field`, `badge` for
-   criteria chips); on `recommendInstruments` tool result, navigates to
-   `/result/$runId`.
+1. Responsibility: Chat entry point using `@tanstack/ai-react`'s `useChat`
+   (`fetchServerSentEvents` to `/api/consult/chat?sessionId=`) wired to
+   `@windwise/ai/tool-defs` client tools.
+2. Logic: `startConsultation` on mount (anon cookie `ww_anon`, published
+   question set, intent `discover`, locale `vi`); on `recommendInstruments` tool
+   result, navigate to `/result/$runId`. Always shows "Chuyển sang biểu mẫu".
+   Provider/start errors also link to `/form`.
 3. Constraints: composes `@windwise/ui` primitives only — no new domain
-   components added to `packages/ui` (AGENTS.md §9). Renders a visible "Switch
-   to form" link at all times (User Story 4 discoverability), not only on error.
+   components added to `packages/ui` (AGENTS.md §9).
+
+### Create Route - `apps/consumer-application/src/routes/api/consult/chat.ts`
+
+1. Responsibility: POST SSE handler dynamically importing `handleConsultChat` so
+   the route module itself does not load postgres.
+2. Logic (`consult-chat.ts`): `chat()` with `createConsultationAdapter()`,
+   `SYSTEM_PROMPT_V1`, `createConsultationTools(db, sessionId)`; after the
+   stream, `validateAssistantText` and possibly append `templatedRephrase`.
 
 ### Create Route - `apps/consumer-application/src/routes/form/index.tsx`
 
-1. Responsibility: Non-AI multi-step form fallback covering the same six
-   criteria fields, independent of any LLM provider.
-2. Logic: multi-step wizard (Zustand-backed local step state, matching
-   `plan.md`'s `consultation-store.ts`) rendering one `@windwise/ui` `field`
-   group per required criterion, then optional criteria; on final submit, calls
-   a server function (`submitForm`) that assembles `Criteria`, validates, calls
-   the same catalog/rule-set load + `recommend()` + `persistRun` sequence as
-   `recommendInstruments` (factored into a shared `runRecommendation()` helper
-   in `@windwise/ai` or a neutral shared location both surfaces import, to avoid
-   duplicating the five-step sequence).
+1. Responsibility: Thin route rendering `FormPage`
+   (`src/modules/form-page/form-page.tsx`).
+2. Logic: multi-step `@windwise/ui` `Questionnaire` driven by
+   `formCriteriaQuestions()` (one item per picklist criterion, skip allowed on
+   optional). No Zustand store. On submit, `criteriaFromFormData` + `submitForm`
+   server function → navigate to `/result/$runId`. Always shows "Chuyển sang hội
+   thoại".
 3. Constraints: must render and submit successfully with zero network calls to
-   any LLM provider — verified by a test that mocks/blocks provider SDK calls
-   during this route's test suite.
+   any LLM provider — verified by `form-no-llm.test.ts` (importing the form
+   route must not call `@tanstack/ai-openai` / `@tanstack/ai-gemini`).
+
+### Create Primitive - `packages/ui/src/components/questionnaire.tsx`
+
+1. Responsibility: Generic shadcn Questionnaire wrapper (progress, items,
+   choices, skip/next/submit). Not a Windwise-domain component.
+2. Constraints: AGENTS.md §9 — no `ConsultationStep` naming. App supplies
+   criteria copy and submit behavior.
 
 ### Create Server Function - `apps/consumer-application/src/lib/server/consultation.ts`
 
 1. Responsibility: Thin TanStack Start `createServerFn` wrappers the route layer
-   calls; the shared seam between chat and form for the actual
-   recommend-and-persist sequence.
+   calls. Recommend-and-persist itself lives in `@windwise/ai`
+   (`runRecommendation` / `submitFormConsultation`).
 2. Methods:
-   - `runRecommendation(criteria: Criteria, sessionId: string): Promise<RecommendationResult>`
-     — the single function both `recommendInstruments` (chat tool) and the
-     form's submit handler call; lives in a package (not app-local) if reused by
-     `@windwise/ai`, to avoid the app importing the tool internals or vice
-     versa. (Resolve exact placement — `@windwise/ai` vs. a small neutral module
-     — during implementation; do not duplicate the five-step sequence in two
-     places regardless of where it lives.)
-   - `getOtherOptions(runId: string, afterRank: number): Promise< RecommendationItem[]>`
-     — calls `getRun`, slices `items` starting at `afterRank + 1`.
-3. Constraints: server-only (`createServerFn`); never imported into a
-   client-only bundle path.
+   - `startConsultation()` — cookie `ww_anon`, `createSession`, returns
+     `{sessionId, questionSetId, engineVersion}`.
+   - `submitForm` — validates `CriteriaSchema`, creates a session, calls
+     `submitFormConsultation`.
+   - `getSharedResult({runId})` — `getRun`; `{error: 'NOT_FOUND'}` when missing.
+   - `getOtherOptions({runId, afterRank})` — `getRun`, filter
+     `rank > afterRank`.
+   - `getSessionCriteria({sessionId})` — `answersToCriteria`.
+3. Constraints: server-only (`createServerFn`); dynamic-import `@windwise/db`
+   and `@windwise/ai` so they are never pulled into a client-only bundle path.
 
 ### Create Route - `apps/consumer-application/src/routes/result/$runId.tsx`
 
-1. Responsibility: Shareable, pinned recommendation result page (FR-011).
-2. Logic: loader calls `getRun(runId)` server-side; renders top items with
-   reasons, verification date, source link, and scope-labeled price per item
-   using existing `@windwise/ui` `card`/`badge`; renders a "show other options"
-   button calling `getOtherOptions`; renders `noMatch` state (with
-   `limitingConstraint` + `suggestion`) when `items` is empty.
+1. Responsibility: Shareable, pinned recommendation result page (FR-011); UI in
+   `src/modules/result-page/result-page.tsx`.
+2. Logic: loader calls `getSharedResult`; renders ranked items with reasons,
+   verification date, source link, and scope-labeled price; "Xem gợi ý khác"
+   calls `getOtherOptions` in pages of 3; `noMatch` and not-found states with
+   form/chat CTAs; copy-share-link; criteria chips via
+   `formCriteriaQuestions()`. Stale verification: `STALE_AFTER_MS` = 180 days
+   (`badge` destructive).
 3. Constraints: never re-runs `recommend()` — reads persisted
-   `recommendation_items` only, so a shared link renders identically regardless
-   of later catalog/rule changes (FR-011, SC-005). Staleness of `lastVerifiedAt`
-   must be visually indicated (e.g., a `badge` variant) when past a defined
-   threshold, not hidden.
+   `recommendation_items` only (FR-011, SC-005).
 
 ### Create Test - `apps/consumer-application` chat/form parity integration test
 
@@ -649,17 +799,18 @@ routes/UI → tests/changesets.
    normalized output, once the form's direct submission) and assert deep-equal
    results (excluding `runId`, `createdAt`, `latencyMs`).
 3. Constraints: `vite-plus/test`; does not require a live LLM call — chat-path
-   normalization determinism is covered separately by `collectAnswers`
-   golden-file tests in `@windwise/ai`.
+   normalization is covered by `@windwise/ai` `normalize` / `collectAnswers`
+   tests. Additional app tests: `form-no-llm.test.ts`,
+   `chat-route-client-safe.test.ts`.
 
 ### Create Changesets - `.changeset/*.md`
 
 1. Responsibility: Record new packages and consumer app changes per AGENTS.md
    §7.
 2. Content: `minor` changesets for `@windwise/schemas`, `@windwise/core`,
-   `@windwise/db`, `@windwise/ai` (new packages at `0.1.0`,
-   `"version": "0.1.0"`, `"private": true` per AGENTS.md); `minor` for
-   `@windwise/consumer-application` (new routes/behavior).
+   `@windwise/db`, `@windwise/ai` (new packages at `0.1.0`); `minor` for
+   `@windwise/consumer-application`; `patch` for `@windwise/ui` Questionnaire
+   button typing.
 3. Constraints: no `Co-authored-by` trailer; do not run `changeset:version` as
    part of this work.
 
@@ -678,16 +829,18 @@ routes/UI → tests/changesets.
    package that needs them.
 3. **Package boundaries**: `@windwise/core` must not import React, TanStack, or
    a DB driver (enforced via oxlint). `@windwise/db` must not be imported by any
-   client-bundled route component — server functions only. `packages/ ui` must
-   not gain instrument/recommendation/consultation-named components (AGENTS.md
-   §9) — those compose in `apps/consumer-application`.
+   client-bundled route component — server functions and `consult-chat.ts` only,
+   typically via dynamic `import()`. `packages/ui` must not gain
+   instrument/recommendation/consultation-named components (AGENTS.md §9) —
+   those compose in `apps/consumer-application`. Generic `Questionnaire` in
+   `@windwise/ui` is allowed. `@windwise/ai/tool-defs` is the only
+   `@windwise/ai` entry the consult chat client may import.
 4. **Error handling**: no `GlobalExceptionHandler`-style pattern. Server
    functions throw typed errors (e.g., `MissingRequiredCriteriaError`,
-   `NoPublishedCatalogError`); route loaders/actions catch and map to TanStack
-   Router error boundaries or inline UI empty/error states, matching the
-   existing `@windwise/ui` notice/dialog/toast patterns from work item 004.
-   LLM/provider failures degrade to a visible "switch to form" affordance (User
-   Story 4), not a generic error page.
+   `NoPublishedCatalogError`, `ProviderUnavailableError`,
+   `UnmappedCriteriaError`); route loaders/actions catch and map to inline UI
+   empty/error states. LLM/provider failures degrade to a visible "switch to
+   form" affordance (User Story 4), not a generic error page.
 5. **Changesets**: one changeset per package whose public API or shipped
    behavior changes; skip for docs/spec/test-only edits. New workspace members
    ship `"version": "0.1.0"`, `"private": true` at creation.
@@ -696,10 +849,12 @@ routes/UI → tests/changesets.
    if a package's usage isn't obvious from its exports (optional, not required
    by this prompt).
 7. **Determinism discipline**: any function that is part of the parity guarantee
-   (`recommend()`, the rule interpreter, `runRecommendation`'s non-LLM steps)
-   must not read wall-clock time, randomness, or ambient state as part of its
-   scoring logic — only as metadata (`createdAt`, `latencyMs`) attached after
-   the deterministic computation.
+   (`recommend()`, the rule interpreter, `runRecommendation`'s non-LLM steps,
+   `heuristicNormalize`) must not read wall-clock time, randomness, or ambient
+   state as part of its scoring/normalization logic — only as metadata
+   (`createdAt`, `latencyMs`) attached after the deterministic computation.
+8. **Form questions from schema**: do not hand-maintain a parallel question list
+   in the app; drive the questionnaire from `formCriteriaQuestions()`.
 
 ## Safeguards
 
@@ -715,16 +870,17 @@ routes/UI → tests/changesets.
    function — catalog/rule set are loaded once by the caller and passed in).
    First chat token target <1.5s p95; full consultation <60s median end-to-end
    (plan.md NFRs, carried into SC-001).
-3. **Security**: LLM provider API keys never leave server-only env vars
-   (`env.ts`), never appear in client bundles or logs. The rule `condition` AST
-   is interpreted via a fixed-operator switch — never `eval`'d as code. No
-   prompt text, system instructions, or raw provider error bodies are ever
-   returned to the client in an error response.
+3. **Security**: LLM provider API keys never leave server-only process env
+   (`OPENAI_API_KEY` read in `@windwise/ai` `adapter.ts`), never appear in
+   client bundles or logs. The rule `condition` AST is interpreted via a
+   fixed-operator switch — never `eval`'d as code. No prompt text, system
+   instructions, or raw provider error bodies are ever returned to the client in
+   an error response.
 4. **Integration**: `@windwise/core` has zero React/TanStack/DB imports
    (build-time enforced). `@windwise/db` is never imported outside server
-   functions. `apps/manager-dashboard` is untouched by this work item.
-   PowerSync's existing wiring in `apps/consumer-application` is not modified or
-   routed through for catalog/consultation data.
+   functions / `consult-chat.ts`. `apps/manager-dashboard` is untouched by this
+   work item. PowerSync's existing wiring in `apps/consumer-application` is not
+   modified or routed through for catalog/consultation data.
 5. **Business rules**: Every `RecommendationResult` item returned to a consumer
    route must include a non-empty `reasons` array, a `lastVerifiedAt` date, a
    source link, and a scope-labeled price — an item missing any of these is a
@@ -733,18 +889,20 @@ routes/UI → tests/changesets.
    byte-identical `RecommendationResult` for identical `Criteria` (SC-004) —
    verified by the parity integration test, not just asserted by architecture.
    "Other options" must never trigger a new `recommend()` call or new LLM
-   generation (FR-006). A `RecommendationRun` is immutable once persisted — no
-   update path exists for `recommendation_runs`/`recommendation_items` rows.
+   generation (FR-006). A `RecommendationRun` row is immutable once inserted —
+   no update path exists for `recommendation_runs`/`recommendation_items`
+   (session status may still flip to `completed`). `budgetCeilingVnd` must not
+   be collected by the form.
 6. **Technical constraints**: No new production dependency added to
    `@windwise/core` beyond `@windwise/schemas`. No `Function`/`eval`
    construction anywhere in the rule interpreter. New Postgres/Drizzle
    dependency is scoped to `@windwise/db` only, not added to
-   `apps/consumer-application`'s direct dependencies.
+   `apps/consumer-application`'s direct dependencies. Result-page stale
+   threshold is 180 days.
 7. **Data constraints**: `consultation_sessions` and related tables store no PII
-   — `anon_id` (a cookie-issued session identifier) is the only person-linkable
-   column anywhere in this feature's schema (FR-012). `instrument_models` reads
-   are filtered to `status = 'published'` only, everywhere, with no exception
-   path.
+   — `anon_id` (cookie `ww_anon`) is the only person-linkable column anywhere in
+   this feature's schema (FR-012). `instrument_models` reads are filtered to
+   `status = 'published'` only, everywhere, with no exception path.
 8. **API constraints**: `recommend(criteria, catalog, ruleSet)`'s signature is
    the stable contract both surfaces depend on — changing it requires updating
    both callers in the same change, not independently. Tool schemas

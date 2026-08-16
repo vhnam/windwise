@@ -36,3 +36,8 @@ dist-ssr
 !.vscode/settings.json
 !.vscode/extensions.json
 .gitnexus/
+
+# Skills CLI lockfile is tracked; install those skills locally (`npx skills`).
+# Spec Kit and GitNexus under .claude/skills/ are repo-owned and stay committed.
+.agents/
+.claude/skills/ui-ux-pro-max

@@ -2,8 +2,10 @@ import { Questionnaire as QuestionnairePrimitive } from '@shadcn/react/questionn
 import { CheckIcon } from 'lucide-react';
 import * as React from 'react';
 
-import { buttonVariants, type Button } from '#/components/button';
+import { buttonVariants, Button } from '#/components/button';
 import { cn } from '#/lib/utils';
+
+type QuestionnaireButtonStyle = Partial<Pick<React.ComponentProps<typeof Button>, 'size' | 'variant'>>;
 
 function Questionnaire({ className, ...props }: React.ComponentProps<typeof QuestionnairePrimitive.Root>) {
   return (
@@ -169,8 +171,7 @@ function QuestionnairePrevious({
   size = 'default',
   variant = 'outline',
   ...props
-}: React.ComponentProps<typeof QuestionnairePrimitive.Previous> &
-  Pick<React.ComponentProps<typeof Button>, 'size' | 'variant'>) {
+}: React.ComponentProps<typeof QuestionnairePrimitive.Previous> & QuestionnaireButtonStyle) {
   return (
     <QuestionnairePrimitive.Previous
       data-slot="questionnaire-previous"
@@ -194,8 +195,7 @@ function QuestionnaireSkip({
   size = 'default',
   variant = 'outline',
   ...props
-}: React.ComponentProps<typeof QuestionnairePrimitive.Skip> &
-  Pick<React.ComponentProps<typeof Button>, 'size' | 'variant'>) {
+}: React.ComponentProps<typeof QuestionnairePrimitive.Skip> & QuestionnaireButtonStyle) {
   return (
     <QuestionnairePrimitive.Skip
       data-slot="questionnaire-skip"
@@ -219,8 +219,7 @@ function QuestionnaireNext({
   size = 'default',
   variant = 'default',
   ...props
-}: React.ComponentProps<typeof QuestionnairePrimitive.Next> &
-  Pick<React.ComponentProps<typeof Button>, 'size' | 'variant'>) {
+}: React.ComponentProps<typeof QuestionnairePrimitive.Next> & QuestionnaireButtonStyle) {
   return (
     <QuestionnairePrimitive.Next
       data-slot="questionnaire-next"
@@ -244,8 +243,7 @@ function QuestionnaireSubmit({
   size = 'default',
   variant = 'default',
   ...props
-}: React.ComponentProps<typeof QuestionnairePrimitive.Submit> &
-  Pick<React.ComponentProps<typeof Button>, 'size' | 'variant'>) {
+}: React.ComponentProps<typeof QuestionnairePrimitive.Submit> & QuestionnaireButtonStyle) {
   return (
     <QuestionnairePrimitive.Submit
       data-slot="questionnaire-submit"

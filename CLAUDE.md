@@ -6,7 +6,12 @@ Claude and Cursor. Do not duplicate or override it here.
 Claude-specific entry points:
 
 - Spec Kit skills: `.claude/skills/speckit-*` (`/speckit-specify`,
-  `/speckit-clarify`, `/speckit-plan`)
+  `/speckit-clarify`, `/speckit-plan`) — repo-owned, committed
+- GitNexus skills: `.claude/skills/gitnexus/` — repo-owned, committed
+- Third-party skills: `skills-lock.json` only. Reinstall with `npx skills`. Do
+  not commit lockfile install trees (`.agents/`,
+  `.claude/skills/ui-ux-pro-max`). When adding a lockfile skill, gitignore its
+  install path. Full rule in [AGENTS.md](./AGENTS.md).
 - Open-SPDD commands: `.claude/commands/spdd-*.md` (`/spdd-analysis`,
   `/spdd-reasons-canvas`, `/spdd-generate`, `/spdd-prompt-update`, `/spdd-sync`)
 
@@ -17,8 +22,8 @@ Spec Kit stops after `/speckit-plan` unless the user explicitly asks for
 
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **windwise** (531 symbols, 598
-relationships, 0 execution flows). Use the GitNexus MCP tools to understand
+This project is indexed by GitNexus as **windwise** (2248 symbols, 3390
+relationships, 63 execution flows). Use the GitNexus MCP tools to understand
 code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it
