@@ -1,5 +1,13 @@
 # @windwise/schemas
 
+## 0.3.0
+
+### Minor Changes
+
+- c998456: Add Valibot schemas for mention resolution/confirmation and for
+  compare/upgrade results (side-by-side model views, published comparison notes,
+  and family/tier-scoped upgrade criteria).
+
 ## 0.2.0
 
 ### Minor Changes

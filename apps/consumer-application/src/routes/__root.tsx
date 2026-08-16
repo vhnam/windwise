@@ -5,6 +5,7 @@ import type { QueryRouterContext } from '@windwise/query';
 import { Toaster } from '@windwise/ui/components/toast';
 import { ThemeProvider } from '@windwise/ui/lib/theme-provider';
 
+import faviconPng from '#/assets/favicon.png?url';
 import PowerSyncProvider from '#/integrations/powersync/provider';
 
 import appCss from '@windwise/ui?url';
@@ -20,10 +21,23 @@ export const Route = createRootRouteWithContext<QueryRouterContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
+        name: 'description',
+        content: 'WindWise is a platform for consulting with AI, woodwind and brass instruments.',
+      },
+      {
+        name: 'keywords',
+        content: 'WindWise, AI, consulting, woodwind, brass, instrument',
+      },
+      {
         title: 'WindWise',
       },
     ],
     links: [
+      {
+        rel: 'icon',
+        type: 'image/png',
+        href: faviconPng,
+      },
       {
         rel: 'stylesheet',
         href: appCss,

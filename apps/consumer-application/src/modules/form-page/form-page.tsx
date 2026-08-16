@@ -1,5 +1,5 @@
 import { Link, useNavigate } from '@tanstack/react-router';
-import { ArrowLeftIcon, Loader2Icon, MessagesSquareIcon, ShieldCheckIcon } from 'lucide-react';
+import { Loader2Icon, MessagesSquareIcon, ShieldCheckIcon } from 'lucide-react';
 import { useState, type SubmitEvent } from 'react';
 import * as v from 'valibot';
 
@@ -23,8 +23,9 @@ import {
   QuestionnaireTitle,
 } from '@windwise/ui/components/questionnaire';
 
+import { AppHeader } from '#/components/app-header';
 import { submitForm } from '#/lib/server/consultation';
-import { UndrawIllustration } from '#/modules/home-page/undraw-illustration';
+import { UndrawIllustration } from '#/modules/illustrations';
 
 const QUESTIONS = formCriteriaQuestions();
 
@@ -91,20 +92,9 @@ function FormPage() {
       </div>
 
       <div className="relative mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
-        <header className="flex items-center justify-between gap-4">
-          <Button
-            nativeButton={false}
-            variant="ghost"
-            className="h-11 min-h-11 px-2.5 text-sm font-semibold tracking-wide"
-            render={<Link to="/" />}
-          >
-            <ArrowLeftIcon data-icon="inline-start" aria-hidden="true" />
-            WindWise
-          </Button>
-          <Badge variant="outline">Biểu mẫu tư vấn</Badge>
-        </header>
+        <AppHeader badge="Biểu mẫu tư vấn" backTo="/" />
 
-        <main className="flex flex-1 flex-col gap-10 py-10 sm:gap-12 sm:py-14">
+        <main id="main-content" className="flex flex-1 flex-col gap-10 py-10 sm:gap-12 sm:py-14">
           <section className="grid items-start gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-14">
             <div className="flex flex-col gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500">
               <div className="flex flex-col gap-3">
@@ -126,7 +116,7 @@ function FormPage() {
                 size="lg"
                 variant="outline"
                 className="h-11 min-h-11 w-fit px-4 text-sm"
-                render={<Link to="/consult" />}
+                render={<Link to="/consult/chat" />}
               >
                 <MessagesSquareIcon data-icon="inline-start" aria-hidden="true" />
                 Chuyển sang hội thoại
@@ -150,7 +140,7 @@ function FormPage() {
                     className="mb-4 border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm leading-relaxed text-destructive"
                   >
                     {submitError}{' '}
-                    <Link to="/consult" className="font-medium underline underline-offset-4">
+                    <Link to="/consult/chat" className="font-medium underline underline-offset-4">
                       Mở hội thoại
                     </Link>
                   </p>

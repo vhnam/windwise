@@ -1,5 +1,20 @@
 # @windwise/ai
 
+## 0.3.0
+
+### Minor Changes
+
+- c998456: Add resolveMention, confirmMention, compareModels, and suggestUpgrade
+  consultation tools. Compare and upgrade refuse unconfirmed model mentions
+  (confirmation gate).
+
+### Patch Changes
+
+- Updated dependencies [c998456]
+  - @windwise/schemas@0.3.0
+  - @windwise/core@0.3.0
+  - @windwise/db@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

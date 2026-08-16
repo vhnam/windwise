@@ -10,9 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CompareIndexRouteImport } from './routes/compare/index'
 import { Route as ConsultIndexRouteImport } from './routes/consult/index'
+import { Route as ConsultChatRouteImport } from './routes/consult/chat'
+import { Route as ConsultIntentRouteImport } from './routes/consult/intent'
 import { Route as FormIndexRouteImport } from './routes/form/index'
 import { Route as ResultRunIdRouteImport } from './routes/result/$runId'
+import { Route as UpgradeIndexRouteImport } from './routes/upgrade/index'
 import { Route as ApiConsultChatRouteImport } from './routes/api/consult/chat'
 
 const IndexRoute = IndexRouteImport.update({
@@ -20,9 +24,24 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CompareIndexRoute = CompareIndexRouteImport.update({
+  id: '/compare/',
+  path: '/compare/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConsultIndexRoute = ConsultIndexRouteImport.update({
   id: '/consult/',
   path: '/consult/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConsultChatRoute = ConsultChatRouteImport.update({
+  id: '/consult/chat',
+  path: '/consult/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConsultIntentRoute = ConsultIntentRouteImport.update({
+  id: '/consult/intent',
+  path: '/consult/intent',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FormIndexRoute = FormIndexRouteImport.update({
@@ -35,6 +54,11 @@ const ResultRunIdRoute = ResultRunIdRouteImport.update({
   path: '/result/$runId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UpgradeIndexRoute = UpgradeIndexRouteImport.update({
+  id: '/upgrade/',
+  path: '/upgrade/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiConsultChatRoute = ApiConsultChatRouteImport.update({
   id: '/api/consult/chat',
   path: '/api/consult/chat',
@@ -43,46 +67,83 @@ const ApiConsultChatRoute = ApiConsultChatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/consult/chat': typeof ConsultChatRoute
+  '/consult/intent': typeof ConsultIntentRoute
   '/result/$runId': typeof ResultRunIdRoute
+  '/compare/': typeof CompareIndexRoute
   '/consult/': typeof ConsultIndexRoute
   '/form/': typeof FormIndexRoute
+  '/upgrade/': typeof UpgradeIndexRoute
   '/api/consult/chat': typeof ApiConsultChatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/consult/chat': typeof ConsultChatRoute
+  '/consult/intent': typeof ConsultIntentRoute
   '/result/$runId': typeof ResultRunIdRoute
+  '/compare': typeof CompareIndexRoute
   '/consult': typeof ConsultIndexRoute
   '/form': typeof FormIndexRoute
+  '/upgrade': typeof UpgradeIndexRoute
   '/api/consult/chat': typeof ApiConsultChatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/consult/chat': typeof ConsultChatRoute
+  '/consult/intent': typeof ConsultIntentRoute
   '/result/$runId': typeof ResultRunIdRoute
+  '/compare/': typeof CompareIndexRoute
   '/consult/': typeof ConsultIndexRoute
   '/form/': typeof FormIndexRoute
+  '/upgrade/': typeof UpgradeIndexRoute
   '/api/consult/chat': typeof ApiConsultChatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/result/$runId' | '/consult/' | '/form/' | '/api/consult/chat'
+    | '/'
+    | '/consult/chat'
+    | '/consult/intent'
+    | '/result/$runId'
+    | '/compare/'
+    | '/consult/'
+    | '/form/'
+    | '/upgrade/'
+    | '/api/consult/chat'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/result/$runId' | '/consult' | '/form' | '/api/consult/chat'
+  to:
+    | '/'
+    | '/consult/chat'
+    | '/consult/intent'
+    | '/result/$runId'
+    | '/compare'
+    | '/consult'
+    | '/form'
+    | '/upgrade'
+    | '/api/consult/chat'
   id:
     | '__root__'
     | '/'
+    | '/consult/chat'
+    | '/consult/intent'
     | '/result/$runId'
+    | '/compare/'
     | '/consult/'
     | '/form/'
+    | '/upgrade/'
     | '/api/consult/chat'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ConsultChatRoute: typeof ConsultChatRoute
+  ConsultIntentRoute: typeof ConsultIntentRoute
   ResultRunIdRoute: typeof ResultRunIdRoute
+  CompareIndexRoute: typeof CompareIndexRoute
   ConsultIndexRoute: typeof ConsultIndexRoute
   FormIndexRoute: typeof FormIndexRoute
+  UpgradeIndexRoute: typeof UpgradeIndexRoute
   ApiConsultChatRoute: typeof ApiConsultChatRoute
 }
 
@@ -95,11 +156,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/compare/': {
+      id: '/compare/'
+      path: '/compare'
+      fullPath: '/compare/'
+      preLoaderRoute: typeof CompareIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/consult/': {
       id: '/consult/'
       path: '/consult'
       fullPath: '/consult/'
       preLoaderRoute: typeof ConsultIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/consult/chat': {
+      id: '/consult/chat'
+      path: '/consult/chat'
+      fullPath: '/consult/chat'
+      preLoaderRoute: typeof ConsultChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/consult/intent': {
+      id: '/consult/intent'
+      path: '/consult/intent'
+      fullPath: '/consult/intent'
+      preLoaderRoute: typeof ConsultIntentRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/form/': {
@@ -116,6 +198,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResultRunIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/upgrade/': {
+      id: '/upgrade/'
+      path: '/upgrade'
+      fullPath: '/upgrade/'
+      preLoaderRoute: typeof UpgradeIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/consult/chat': {
       id: '/api/consult/chat'
       path: '/api/consult/chat'
@@ -128,9 +217,13 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ConsultChatRoute: ConsultChatRoute,
+  ConsultIntentRoute: ConsultIntentRoute,
   ResultRunIdRoute: ResultRunIdRoute,
+  CompareIndexRoute: CompareIndexRoute,
   ConsultIndexRoute: ConsultIndexRoute,
   FormIndexRoute: FormIndexRoute,
+  UpgradeIndexRoute: UpgradeIndexRoute,
   ApiConsultChatRoute: ApiConsultChatRoute,
 }
 export const routeTree = rootRouteImport

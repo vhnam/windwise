@@ -1,5 +1,18 @@
 # @windwise/core
 
+## 0.3.0
+
+### Minor Changes
+
+- c998456: Add deterministic mention ranking, catalog comparison assembly, and
+  family/tier-scoped upgrade suggestion engines. Recommendation scores and
+  catalog facts stay in structured logic, not the LLM.
+
+### Patch Changes
+
+- Updated dependencies [c998456]
+  - @windwise/schemas@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes

@@ -1,5 +1,18 @@
 # @windwise/db
 
+## 0.3.0
+
+### Minor Changes
+
+- c998456: Add model aliases, published comparison notes, and confirmed session
+  references, plus fuzzy catalog match, pin, and note queries. Seed sample
+  aliases/notes and ship the matching Drizzle migration.
+
+### Patch Changes
+
+- Updated dependencies [c998456]
+  - @windwise/schemas@0.3.0
+
 ## 0.2.0
 
 ### Minor Changes
