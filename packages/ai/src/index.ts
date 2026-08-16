@@ -1,6 +1,21 @@
-export { collectAnswersToolDef, recommendInstrumentsToolDef } from './tool-defs.ts';
+export {
+  collectAnswersToolDef,
+  compareModelsToolDef,
+  confirmMentionToolDef,
+  recommendInstrumentsToolDef,
+  resolveMentionToolDef,
+  suggestUpgradeToolDef,
+} from './tool-defs.ts';
 export { createConsultationAdapter } from './adapter.ts';
-export { collectAnswers, recommendInstruments, createConsultationTools } from './tools.ts';
+export {
+  collectAnswers,
+  recommendInstruments,
+  resolveMention,
+  confirmMention,
+  compareModels,
+  suggestUpgrade,
+  createConsultationTools,
+} from './tools.ts';
 export { answersToCriteria, criteriaToAnswers } from './answers.ts';
 export { runRecommendation, submitFormConsultation } from './run-recommendation.ts';
 export { validateAssistantText, templatedRephrase } from './output-validator.ts';
