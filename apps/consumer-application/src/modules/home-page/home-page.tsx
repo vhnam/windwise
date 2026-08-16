@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ClipboardListIcon, MessagesSquareIcon, ShieldCheckIcon } from 'lucide-react';
+import { ClipboardListIcon, LibraryBigIcon, MessagesSquareIcon, ShieldCheckIcon } from 'lucide-react';
 
 import { Badge } from '@windwise/ui/components/badge';
 import { Button } from '@windwise/ui/components/button';
@@ -74,6 +74,16 @@ function HomePage() {
                 >
                   <ClipboardListIcon data-icon="inline-start" aria-hidden="true" />
                   Dùng biểu mẫu
+                </Button>
+                <Button
+                  nativeButton={false}
+                  size="lg"
+                  variant="ghost"
+                  className="h-11 min-h-11 px-4 text-sm"
+                  render={<Link to="/catalog" />}
+                >
+                  <LibraryBigIcon data-icon="inline-start" aria-hidden="true" />
+                  Xem danh mục
                 </Button>
               </div>
               <p className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">

@@ -1,0 +1,65 @@
+import { createFileRoute } from '@tanstack/react-router';
+
+import type { BudgetBand, Section } from '@windwise/schemas';
+
+import { getCatalogFacetsFn, listInstrumentsFn } from '#/lib/server/catalog';
+import { CatalogPage } from '#/modules/catalog-page';
+
+type FamilySearch = {
+  section?: Section;
+  budgetBand?: BudgetBand;
+  brand?: string;
+};
+
+const SECTIONS = new Set(['brass', 'woodwind']);
+const BUDGET_BANDS = new Set(['under_20m', '20_50m', '50_100m', 'over_100m']);
+
+function readSearchString(search: Record<string, unknown>, key: string, allowed?: Set<string>) {
+  const value = search[key];
+  if (typeof value !== 'string' || value.length === 0) {
+    return undefined;
+  }
+  if (allowed && !allowed.has(value)) {
+    return undefined;
+  }
+  return value;
+}
+
+export const Route = createFileRoute('/catalog/$familySlug')({
+  validateSearch: (search: Record<string, unknown>): FamilySearch => ({
+    section: readSearchString(search, 'section', SECTIONS) as FamilySearch['section'],
+    budgetBand: readSearchString(search, 'budgetBand', BUDGET_BANDS) as FamilySearch['budgetBand'],
+    brand: readSearchString(search, 'brand'),
+  }),
+  loaderDeps: ({ search }) => search,
+  loader: async ({ params, deps }) => {
+    const [listing, facets] = await Promise.all([
+      listInstrumentsFn({ data: { ...deps, family: params.familySlug } }),
+      getCatalogFacetsFn(),
+    ]);
+    return { listing, facets };
+  },
+  component: FamilyCatalogRoute,
+  head: () => ({
+    meta: [{ title: 'Danh mục nhạc cụ — WindWise' }],
+  }),
+});
+
+function FamilyCatalogRoute() {
+  const search = Route.useSearch();
+  const { familySlug } = Route.useParams();
+  const { listing, facets } = Route.useLoaderData();
+  const navigate = Route.useNavigate();
+
+  return (
+    <CatalogPage
+      filters={{ ...search, family: familySlug }}
+      listing={listing}
+      facets={facets}
+      lockedFamily={familySlug}
+      onFiltersChange={({ family: _family, ...rest }) => {
+        void navigate({ search: rest });
+      }}
+    />
+  );
+}
