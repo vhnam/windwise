@@ -7,6 +7,7 @@ import type {
   RecommendationResult,
   RuleSet,
 } from '@windwise/schemas';
+import { BUDGET_BOUNDS, priceOverlapsBudget } from '@windwise/schemas';
 
 import {
   applyEffect,
@@ -18,12 +19,7 @@ import {
 const BASE_SCORE = 50;
 export const ENGINE_VERSION = '0.1.0';
 
-const BUDGET_BOUNDS: Record<Criteria['budget'], { min: number; max: number }> = {
-  under_20m: { min: 0, max: 20_000_000 },
-  '20_50m': { min: 20_000_000, max: 50_000_000 },
-  '50_100m': { min: 50_000_000, max: 100_000_000 },
-  over_100m: { min: 100_000_000, max: Number.POSITIVE_INFINITY },
-};
+export { BUDGET_BOUNDS };
 
 function renderTemplate(template: string, criteria: Criteria): string {
   return template.replaceAll(/\{\{(\w+)\}\}/g, (_, key: string) => {
@@ -38,11 +34,6 @@ function renderTemplate(template: string, criteria: Criteria): string {
 function selectPrice(modelId: string, prices: PricePoint[]): PricePoint | undefined {
   const forModel = prices.filter((price) => price.modelId === modelId && price.isCurrent);
   return forModel.find((price) => price.scope === 'vn_street') ?? forModel[0];
-}
-
-function priceOverlapsBudget(price: PricePoint, budget: Criteria['budget']): boolean {
-  const bounds = BUDGET_BOUNDS[budget];
-  return price.amountMin <= bounds.max && price.amountMax >= bounds.min;
 }
 
 function priceFitsCeiling(price: PricePoint, ceilingVnd: number | undefined): boolean {
