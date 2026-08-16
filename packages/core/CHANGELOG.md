@@ -4,10 +4,9 @@
 
 ### Minor Changes
 
-- c998456: Add compare and upgrade consultation flows with mention confirmation,
-  catalog comparison, and family/tier-scoped recommendations. Member pages share
-  a branded AppHeader with the WindWise lockup and a light-plate treatment in
-  dark mode.
+- c998456: Add deterministic mention ranking, catalog comparison assembly, and
+  family/tier-scoped upgrade suggestion engines. Recommendation scores and
+  catalog facts stay in structured logic, not the LLM.
 
 ### Patch Changes
 

@@ -4,10 +4,9 @@
 
 ### Minor Changes
 
-- c998456: Add compare and upgrade consultation flows with mention confirmation,
-  catalog comparison, and family/tier-scoped recommendations. Member pages share
-  a branded AppHeader with the WindWise lockup and a light-plate treatment in
-  dark mode.
+- c998456: Add model aliases, published comparison notes, and confirmed session
+  references, plus fuzzy catalog match, pin, and note queries. Seed sample
+  aliases/notes and ship the matching Drizzle migration.
 
 ### Patch Changes
 

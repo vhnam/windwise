@@ -4,10 +4,10 @@
 
 ### Minor Changes
 
-- c998456: Add compare and upgrade consultation flows with mention confirmation,
-  catalog comparison, and family/tier-scoped recommendations. Member pages share
-  a branded AppHeader with the WindWise lockup and a light-plate treatment in
-  dark mode.
+- c998456: Add member intent branching (discover, compare, upgrade), mention
+  confirmation, catalog comparison, and family/tier-scoped upgrade
+  recommendations. Split consult chat onto `/consult/chat` and share a branded
+  AppHeader with the WindWise lockup (light-plate treatment in dark mode).
 
 ### Patch Changes
 

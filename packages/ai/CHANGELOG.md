@@ -4,10 +4,9 @@
 
 ### Minor Changes
 
-- c998456: Add compare and upgrade consultation flows with mention confirmation,
-  catalog comparison, and family/tier-scoped recommendations. Member pages share
-  a branded AppHeader with the WindWise lockup and a light-plate treatment in
-  dark mode.
+- c998456: Add resolveMention, confirmMention, compareModels, and suggestUpgrade
+  consultation tools. Compare and upgrade refuse unconfirmed model mentions
+  (confirmation gate).
 
 ### Patch Changes
 
