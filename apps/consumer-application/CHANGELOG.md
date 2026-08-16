@@ -1,5 +1,25 @@
 # @windwise/consumer-application
 
+## 0.2.0
+
+### Minor Changes
+
+- 0fffbac: Add chat, form-fallback, and shareable recommendation result routes
+  for guided consultation.
+
+### Patch Changes
+
+- Updated dependencies [fb5145f]
+- Updated dependencies [dfa8127]
+- Updated dependencies [b65021c]
+- Updated dependencies [1267997]
+- Updated dependencies [47d6187]
+  - @windwise/ai@0.2.0
+  - @windwise/core@0.2.0
+  - @windwise/db@0.2.0
+  - @windwise/schemas@0.2.0
+  - @windwise/ui@0.2.1
+
 ## 0.1.1
 
 ### Patch Changes
