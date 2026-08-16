@@ -39,12 +39,26 @@ Do not duplicate responsibilities between these systems.
 | Feature specs and plans | `docs/specs/<work_item>/` (`spec.md`, `plan.md`, …)                      |
 | Open-SPDD analysis      | `docs/spdd/analysis/<work_item>/`                                        |
 | Open-SPDD prompts       | `docs/spdd/prompt/<work_item>/`                                          |
-| Spec Kit skills         | `.claude/skills/speckit-*`                                               |
+| Spec Kit skills         | `.claude/skills/speckit-*` (repo-owned; committed)                       |
+| GitNexus skills         | `.claude/skills/gitnexus/` (repo-owned; committed)                       |
+| Third-party skills      | `skills-lock.json` only; install locally, do not commit the skill tree   |
 | Open-SPDD commands      | `.claude/commands/spdd-*.md`                                             |
 | Claude entry            | `CLAUDE.md` (pointer to this file; do not fork the workflow there)       |
 | Notion hub              | [Windwise](https://www.notion.so/3b5adaaeb558800eb424e4932168a6a1)       |
 | Notion Agent Workflow   | [Agent Workflow](https://www.notion.so/3bdadaaeb55881749cfce60b5ba33482) |
 | Notion Tasks            | [Tasks](https://www.notion.so/d1afe2b590614536aae67e2723d59a83)          |
+
+### Agent skills
+
+- **Repo-owned** skills stay in git: Spec Kit (`.claude/skills/speckit-*`),
+  GitNexus (`.claude/skills/gitnexus/`), and Open-SPDD commands
+  (`.claude/commands/`). These are not listed in `skills-lock.json`.
+- **Third-party** skills are recorded only in `skills-lock.json`. Do not commit
+  their install trees. Reinstall with the Skills CLI (`npx skills`). Cursor
+  copies under `.agents/` are gitignored; lockfile installs under
+  `.claude/skills/<name>` must be gitignored too (today: `ui-ux-pro-max`).
+- When adding a skill to `skills-lock.json`, add a matching `.gitignore` path
+  for that install. Do not ignore `.claude/skills/` wholesale.
 
 ---
 
@@ -800,8 +814,8 @@ release. Add a tool name to select part of the graph. For example, run
 
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **windwise** (531 symbols, 598
-relationships, 0 execution flows). Use the GitNexus MCP tools to understand
+This project is indexed by GitNexus as **windwise** (2248 symbols, 3390
+relationships, 63 execution flows). Use the GitNexus MCP tools to understand
 code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it
