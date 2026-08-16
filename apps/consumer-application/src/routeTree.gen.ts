@@ -10,11 +10,14 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CatalogIndexRouteImport } from './routes/catalog/index'
+import { Route as CatalogFamilySlugRouteImport } from './routes/catalog/$familySlug'
 import { Route as CompareIndexRouteImport } from './routes/compare/index'
 import { Route as ConsultIndexRouteImport } from './routes/consult/index'
 import { Route as ConsultChatRouteImport } from './routes/consult/chat'
 import { Route as ConsultIntentRouteImport } from './routes/consult/intent'
 import { Route as FormIndexRouteImport } from './routes/form/index'
+import { Route as InstrumentModelIdRouteImport } from './routes/instrument/$modelId'
 import { Route as ResultRunIdRouteImport } from './routes/result/$runId'
 import { Route as UpgradeIndexRouteImport } from './routes/upgrade/index'
 import { Route as ApiConsultChatRouteImport } from './routes/api/consult/chat'
@@ -22,6 +25,16 @@ import { Route as ApiConsultChatRouteImport } from './routes/api/consult/chat'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CatalogIndexRoute = CatalogIndexRouteImport.update({
+  id: '/catalog/',
+  path: '/catalog/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CatalogFamilySlugRoute = CatalogFamilySlugRouteImport.update({
+  id: '/catalog/$familySlug',
+  path: '/catalog/$familySlug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompareIndexRoute = CompareIndexRouteImport.update({
@@ -49,6 +62,11 @@ const FormIndexRoute = FormIndexRouteImport.update({
   path: '/form/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InstrumentModelIdRoute = InstrumentModelIdRouteImport.update({
+  id: '/instrument/$modelId',
+  path: '/instrument/$modelId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResultRunIdRoute = ResultRunIdRouteImport.update({
   id: '/result/$runId',
   path: '/result/$runId',
@@ -67,9 +85,12 @@ const ApiConsultChatRoute = ApiConsultChatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/catalog/$familySlug': typeof CatalogFamilySlugRoute
   '/consult/chat': typeof ConsultChatRoute
   '/consult/intent': typeof ConsultIntentRoute
+  '/instrument/$modelId': typeof InstrumentModelIdRoute
   '/result/$runId': typeof ResultRunIdRoute
+  '/catalog/': typeof CatalogIndexRoute
   '/compare/': typeof CompareIndexRoute
   '/consult/': typeof ConsultIndexRoute
   '/form/': typeof FormIndexRoute
@@ -78,9 +99,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/catalog/$familySlug': typeof CatalogFamilySlugRoute
   '/consult/chat': typeof ConsultChatRoute
   '/consult/intent': typeof ConsultIntentRoute
+  '/instrument/$modelId': typeof InstrumentModelIdRoute
   '/result/$runId': typeof ResultRunIdRoute
+  '/catalog': typeof CatalogIndexRoute
   '/compare': typeof CompareIndexRoute
   '/consult': typeof ConsultIndexRoute
   '/form': typeof FormIndexRoute
@@ -90,9 +114,12 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/catalog/$familySlug': typeof CatalogFamilySlugRoute
   '/consult/chat': typeof ConsultChatRoute
   '/consult/intent': typeof ConsultIntentRoute
+  '/instrument/$modelId': typeof InstrumentModelIdRoute
   '/result/$runId': typeof ResultRunIdRoute
+  '/catalog/': typeof CatalogIndexRoute
   '/compare/': typeof CompareIndexRoute
   '/consult/': typeof ConsultIndexRoute
   '/form/': typeof FormIndexRoute
@@ -103,9 +130,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/catalog/$familySlug'
     | '/consult/chat'
     | '/consult/intent'
+    | '/instrument/$modelId'
     | '/result/$runId'
+    | '/catalog/'
     | '/compare/'
     | '/consult/'
     | '/form/'
@@ -114,9 +144,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/catalog/$familySlug'
     | '/consult/chat'
     | '/consult/intent'
+    | '/instrument/$modelId'
     | '/result/$runId'
+    | '/catalog'
     | '/compare'
     | '/consult'
     | '/form'
@@ -125,9 +158,12 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/catalog/$familySlug'
     | '/consult/chat'
     | '/consult/intent'
+    | '/instrument/$modelId'
     | '/result/$runId'
+    | '/catalog/'
     | '/compare/'
     | '/consult/'
     | '/form/'
@@ -137,9 +173,12 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CatalogFamilySlugRoute: typeof CatalogFamilySlugRoute
   ConsultChatRoute: typeof ConsultChatRoute
   ConsultIntentRoute: typeof ConsultIntentRoute
+  InstrumentModelIdRoute: typeof InstrumentModelIdRoute
   ResultRunIdRoute: typeof ResultRunIdRoute
+  CatalogIndexRoute: typeof CatalogIndexRoute
   CompareIndexRoute: typeof CompareIndexRoute
   ConsultIndexRoute: typeof ConsultIndexRoute
   FormIndexRoute: typeof FormIndexRoute
@@ -154,6 +193,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/catalog/': {
+      id: '/catalog/'
+      path: '/catalog'
+      fullPath: '/catalog/'
+      preLoaderRoute: typeof CatalogIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/catalog/$familySlug': {
+      id: '/catalog/$familySlug'
+      path: '/catalog/$familySlug'
+      fullPath: '/catalog/$familySlug'
+      preLoaderRoute: typeof CatalogFamilySlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/compare/': {
@@ -191,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FormIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/instrument/$modelId': {
+      id: '/instrument/$modelId'
+      path: '/instrument/$modelId'
+      fullPath: '/instrument/$modelId'
+      preLoaderRoute: typeof InstrumentModelIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/result/$runId': {
       id: '/result/$runId'
       path: '/result/$runId'
@@ -217,9 +277,12 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CatalogFamilySlugRoute: CatalogFamilySlugRoute,
   ConsultChatRoute: ConsultChatRoute,
   ConsultIntentRoute: ConsultIntentRoute,
+  InstrumentModelIdRoute: InstrumentModelIdRoute,
   ResultRunIdRoute: ResultRunIdRoute,
+  CatalogIndexRoute: CatalogIndexRoute,
   CompareIndexRoute: CompareIndexRoute,
   ConsultIndexRoute: ConsultIndexRoute,
   FormIndexRoute: FormIndexRoute,

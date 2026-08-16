@@ -23,9 +23,10 @@ import {
   QuestionnaireTitle,
 } from '@windwise/ui/components/questionnaire';
 
+import { AppBreadcrumb } from '#/components/app-breadcrumb';
 import { AppHeader } from '#/components/app-header';
+import { UndrawIllustration } from '#/components/illustrations';
 import { submitForm } from '#/lib/server/consultation';
-import { UndrawIllustration } from '#/modules/illustrations';
 
 const QUESTIONS = formCriteriaQuestions();
 
@@ -84,16 +85,19 @@ function FormPage() {
   }
 
   return (
-    <div className="relative min-h-dvh overflow-x-hidden bg-background">
+    <div className="relative flex min-h-dvh flex-col overflow-x-clip bg-background">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 left-1/2 size-[28rem] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl motion-reduce:blur-none dark:bg-primary/25" />
         <div className="absolute top-40 -right-16 size-72 rounded-full bg-chart-2/20 blur-3xl motion-reduce:hidden" />
         <div className="absolute bottom-0 -left-10 size-80 rounded-full bg-chart-3/10 blur-3xl motion-reduce:hidden" />
       </div>
 
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
-        <AppHeader badge="Biểu mẫu tư vấn" backTo="/" />
+      <AppHeader />
+      <AppBreadcrumb
+        items={[{ label: 'Trang chủ', to: '/' }, { label: 'Tư vấn', to: '/consult' }, { label: 'Biểu mẫu' }]}
+      />
 
+      <div className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
         <main id="main-content" className="flex flex-1 flex-col gap-10 py-10 sm:gap-12 sm:py-14">
           <section className="grid items-start gap-10 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:gap-14">
             <div className="flex flex-col gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500">

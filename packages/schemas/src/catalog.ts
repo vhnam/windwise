@@ -12,6 +12,16 @@ export type ModelStatus = v.InferOutput<typeof ModelStatusSchema>;
 export const PriceScopeSchema = v.picklist(['msrp_global', 'vn_street']);
 export type PriceScope = v.InferOutput<typeof PriceScopeSchema>;
 
+export const SourceKindSchema = v.picklist(['manufacturer', 'dealer', 'manual_pdf', 'editorial', 'expert_review']);
+export type SourceKind = v.InferOutput<typeof SourceKindSchema>;
+
+export const BrandSchema = v.object({
+  id: v.string(),
+  slug: v.string(),
+  name: v.string(),
+});
+export type Brand = v.InferOutput<typeof BrandSchema>;
+
 export const InstrumentFamilySchema = v.object({
   id: v.string(),
   slug: v.string(),
@@ -54,3 +64,27 @@ export const CatalogSnapshotSchema = v.object({
   prices: v.array(PricePointSchema),
 });
 export type CatalogSnapshot = v.InferOutput<typeof CatalogSnapshotSchema>;
+
+export const ModelImageSchema = v.object({
+  id: v.string(),
+  modelId: v.string(),
+  url: v.string(),
+  altVi: v.string(),
+  altEn: v.string(),
+  credit: v.string(),
+  licenseNote: v.string(),
+  isPrimary: v.boolean(),
+  sortOrder: v.number(),
+});
+export type ModelImage = v.InferOutput<typeof ModelImageSchema>;
+
+export const SourceSchema = v.object({
+  id: v.string(),
+  modelId: v.string(),
+  kind: SourceKindSchema,
+  url: v.string(),
+  publisher: v.string(),
+  retrievedAt: v.string(),
+  isPrimary: v.boolean(),
+});
+export type Source = v.InferOutput<typeof SourceSchema>;

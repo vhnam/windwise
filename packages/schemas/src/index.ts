@@ -5,3 +5,5 @@ export * from './rules.ts';
 export * from './recommendation.ts';
 export * from './mention.ts';
 export * from './comparison.ts';
+export * from './pricing.ts';
+export * from './catalog-browsing.ts';

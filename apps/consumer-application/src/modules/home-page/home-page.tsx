@@ -1,5 +1,5 @@
 import { Link } from '@tanstack/react-router';
-import { ClipboardListIcon, MessagesSquareIcon, ShieldCheckIcon } from 'lucide-react';
+import { ClipboardListIcon, LibraryBigIcon, MessagesSquareIcon, ShieldCheckIcon } from 'lucide-react';
 
 import { Badge } from '@windwise/ui/components/badge';
 import { Button } from '@windwise/ui/components/button';
@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@wind
 import { Separator } from '@windwise/ui/components/separator';
 
 import { AppHeader } from '#/components/app-header';
-import { UndrawIllustration, type UndrawName } from '#/modules/illustrations';
+import { UndrawIllustration, type UndrawName } from '#/components/illustrations';
 
 type FeatureProps = {
   title: string;
@@ -35,16 +35,16 @@ const FEATURES: FeatureProps[] = [
 
 function HomePage() {
   return (
-    <div className="relative min-h-dvh overflow-x-hidden bg-background">
+    <div className="relative flex min-h-dvh flex-col overflow-x-clip bg-background">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 left-1/2 size-[28rem] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl motion-reduce:blur-none dark:bg-primary/25" />
         <div className="absolute top-40 -right-16 size-72 rounded-full bg-chart-2/20 blur-3xl motion-reduce:hidden" />
         <div className="absolute bottom-0 -left-10 size-80 rounded-full bg-chart-3/10 blur-3xl motion-reduce:hidden" />
       </div>
 
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
-        <AppHeader badge="Tư vấn kèn hơi" />
+      <AppHeader />
 
+      <div className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
         <main id="main-content" className="flex flex-1 flex-col gap-16 py-12 sm:gap-20 sm:py-16">
           <section className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-14">
             <div className="flex flex-col gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500">
@@ -74,6 +74,16 @@ function HomePage() {
                 >
                   <ClipboardListIcon data-icon="inline-start" aria-hidden="true" />
                   Dùng biểu mẫu
+                </Button>
+                <Button
+                  nativeButton={false}
+                  size="lg"
+                  variant="ghost"
+                  className="h-11 min-h-11 px-4 text-sm"
+                  render={<Link to="/catalog" />}
+                >
+                  <LibraryBigIcon data-icon="inline-start" aria-hidden="true" />
+                  Xem danh mục
                 </Button>
               </div>
               <p className="flex items-start gap-2 text-sm leading-relaxed text-muted-foreground">

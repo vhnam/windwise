@@ -58,9 +58,12 @@ framing of this surface as "the SEO surface."
 **Constraints**: Only `published` records may ever appear (spec FR-007);
 budget-band filtering MUST prefer `vn_street` price over an MSRP-derived
 estimate, and MUST flag the estimate when used (spec FR-006, same rule 005 uses
-for consultation budget matching — one shared query function, not two); every
-image requires `credit`/`license_note` before it can render on a published page
-(spec FR-003, platform plan's licensing risk note in §4.3).
+for consultation budget matching and
+[006](../006-instrument-compare-upgrade/plan.md) now also uses for
+`compareModelsCore`'s per-model price display and `suggestUpgrade`'s
+`upgradeBudget` matching — one shared query function, three callers, not three
+copies); every image requires `credit`/`license_note` before it can render on a
+published page (spec FR-003, platform plan's licensing risk note in §4.3).
 
 **Scale/Scope**: Same v1 catalog target as 005/006 — ~60-90 published models
 across ~14 families at full content maturity, a handful at MVP;
@@ -73,10 +76,11 @@ _GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
 
 - **I. Code Quality** — PASS. Budget-band price resolution
   (`vn_street`-preferred, MSRP-fallback-with-estimate-flag) is implemented once
-  in `@windwise/db` and imported by both this feature's listing filter and 005's
-  consultation budget matching, rather than being reimplemented per caller —
-  directly the kind of duplication the constitution's Code Quality principle
-  prohibits.
+  in `@windwise/db` and imported by this feature's listing filter, 005's
+  consultation budget matching, and 006's `compareModelsCore`/`suggestUpgrade`
+  price displays — three callers of one function, rather than being
+  reimplemented per caller, directly the kind of duplication the constitution's
+  Code Quality principle prohibits.
 - **II. Testing Standards** — PASS. New behavior (filtering, variant grouping,
   published-only visibility) ships with unit tests on the query layer and an
   integration test on the SSR route loader confirming draft/in-review/archived

@@ -4,18 +4,22 @@
 
 **Decision**: Extract the "prefer `vn_street`, fall back to MSRP-derived
 estimate flagged as such" logic into one `@windwise/db` function
-(`resolve-budget-price.ts`) used both by this feature's listing filter and by
-005's consultation budget matching (which currently implements the same rule
-inline per 005's data-model.md PricePoint note).
+(`resolve-budget-price.ts`) used by this feature's listing filter, by 005's
+consultation budget matching (which currently implements the same rule inline
+per 005's data-model.md PricePoint note), and by
+[006](../006-instrument-compare-upgrade/plan.md)'s `compareModelsCore()`
+(per-model `price` field, see 006's data-model.md `ComparisonResult`) and
+`suggestUpgrade()`'s `upgradeBudget` matching.
 
 **Rationale**: Spec 007 FR-006 states the identical rule platform plan §3.3
 already specifies for consultation budget filtering ("Budget filtering must use
 `vn_street` when present, falling back to `msrp_global × fx × import_factor`...
-flagged as an estimate"). Two independent implementations of currency/estimate
-logic would drift silently — exactly the duplication the constitution's Code
-Quality principle flags. If 005 already shipped an inline version, this
-feature's implementation work includes promoting it to a shared function, not
-copying it.
+flagged as an estimate"). Independent implementations of currency/estimate logic
+across 005, 006, and this feature would drift silently — exactly the duplication
+the constitution's Code Quality principle flags. If 005 already shipped an
+inline version, this feature's implementation work includes promoting it to a
+shared function and pointing 006's price displays at it too, not copying it a
+third time.
 
 **Alternatives considered**: Reimplementing the same rule locally in this
 feature's query — rejected for the duplication reason above.

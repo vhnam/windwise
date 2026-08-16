@@ -25,9 +25,10 @@ import {
 } from '@windwise/ui/components/card';
 import { Separator } from '@windwise/ui/components/separator';
 
+import { AppBreadcrumb } from '#/components/app-breadcrumb';
 import { AppHeader } from '#/components/app-header';
+import { UndrawIllustration } from '#/components/illustrations';
 import { getOtherOptions, type SharedResult } from '#/lib/server/consultation';
-import { UndrawIllustration } from '#/modules/illustrations';
 
 const STALE_AFTER_MS = 180 * 24 * 60 * 60 * 1000;
 const INITIAL_VISIBLE = 3;
@@ -97,16 +98,19 @@ function criteriaSummary(criteria: Criteria) {
 
 function ResultChrome({ children }: { children: ReactNode }) {
   return (
-    <div className="relative min-h-dvh overflow-x-hidden bg-background">
+    <div className="relative flex min-h-dvh flex-col overflow-x-clip bg-background">
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-24 left-1/2 size-[28rem] -translate-x-1/2 rounded-full bg-primary/15 blur-3xl motion-reduce:blur-none dark:bg-primary/25" />
         <div className="absolute top-40 -right-16 size-72 rounded-full bg-chart-2/20 blur-3xl motion-reduce:hidden" />
         <div className="absolute bottom-0 -left-10 size-80 rounded-full bg-chart-3/10 blur-3xl motion-reduce:hidden" />
       </div>
 
-      <div className="relative mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
-        <AppHeader badge="Kết quả tư vấn" backTo="/" />
+      <AppHeader />
+      <AppBreadcrumb
+        items={[{ label: 'Trang chủ', to: '/' }, { label: 'Tư vấn', to: '/consult' }, { label: 'Kết quả' }]}
+      />
 
+      <div className="relative mx-auto flex w-full max-w-5xl flex-1 flex-col px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
         <main id="main-content" className="flex flex-1 flex-col gap-10 py-10 sm:gap-12 sm:py-14">
           {children}
         </main>

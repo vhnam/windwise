@@ -4,6 +4,15 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vite-plus/test';
 
 import {
+  Breadcrumb,
+  BreadcrumbEllipsis,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '#/components/breadcrumb';
+import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
@@ -21,6 +30,65 @@ import { TooltipProvider } from '#/components/tooltip';
 
 afterEach(() => {
   cleanup();
+});
+
+describe('Breadcrumb', () => {
+  it('renders a labeled trail with a current page', () => {
+    render(
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/catalog">Catalog</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>Saxophone</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>,
+    );
+
+    expect(screen.getByRole('navigation', { name: 'breadcrumb' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: 'Catalog' }).getAttribute('href')).toBe('/catalog');
+    expect(screen.getByText('Saxophone').getAttribute('aria-current')).toBe('page');
+  });
+
+  it('renders a custom separator and collapsed ellipsis', () => {
+    render(
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/">Home</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>/</BreadcrumbSeparator>
+          <BreadcrumbItem>
+            <BreadcrumbEllipsis />
+          </BreadcrumbItem>
+          <BreadcrumbSeparator>/</BreadcrumbSeparator>
+          <BreadcrumbItem>
+            <BreadcrumbPage>Detail</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>,
+    );
+
+    expect(screen.getAllByText('/')).toHaveLength(2);
+    expect(screen.getByText('More')).toBeTruthy();
+  });
+
+  it('renders BreadcrumbLink through a custom element', () => {
+    render(
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink render={<button type="button" />}>Filters</BreadcrumbLink>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Filters' })).toBeTruthy();
+  });
 });
 
 describe('Tabs', () => {

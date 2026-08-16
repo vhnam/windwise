@@ -7,6 +7,9 @@ export { getModelById, getModelsByIds, getCurrentPricesForModels } from './queri
 export { pinReferenceModel } from './queries/pin-reference-model.ts';
 export { confirmedModelIds } from './queries/confirmed-model-ids.ts';
 export { listPublishedComparisonNotes } from './queries/list-published-comparison-notes.ts';
+export { listPublishedInstruments } from './queries/list-published-instruments.ts';
+export { getInstrumentDetail } from './queries/get-instrument-detail.ts';
+export { listCatalogFacets } from './queries/list-catalog-facets.ts';
 export {
   seedDatabase,
   seedCatalogRows,

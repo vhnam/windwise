@@ -2,15 +2,18 @@ import type { ConditionAst, RuleEffect } from '@windwise/schemas';
 
 import type { Database } from '#/client.ts';
 import {
+  brands,
   instrumentFamilies,
   instrumentModels,
   modelAliases,
   modelComparisonNotes,
+  modelImages,
   pricePoints,
   questionSets,
   questions,
   ruleSets,
   rules,
+  sources,
 } from '#/schema/index.ts';
 import { normalizeModelPair } from '#/schema/model-comparison-notes.ts';
 
@@ -157,6 +160,7 @@ function priceRow(modelId: string, scope: 'msrp_global' | 'vn_street', amountMin
 
 export function seedCatalogRows() {
   return {
+    brands: [{ id: SEED_BRAND_ID, slug: 'yamaha', name: 'Yamaha' }],
     families: [
       {
         id: SEED_FAMILY_IDS.trumpet,
@@ -298,6 +302,26 @@ export function seedCatalogRows() {
       priceRow(SEED_MODEL_IDS.yamahaAltoSaxPro, 'vn_street', 70_000_000, 90_000_000),
       priceRow(SEED_MODEL_IDS.yamahaAltoSaxPro, 'msrp_global', 2500, 3200),
     ],
+    images: Object.values(SEED_MODEL_IDS).map((modelId, index) => ({
+      id: modelId.replace('55555555', 'bbbbbbb1'),
+      modelId,
+      url: `https://example.com/images/${modelId}.jpg`,
+      altVi: 'Ảnh nhạc cụ',
+      altEn: 'Instrument photo',
+      credit: 'WindWise catalog team',
+      licenseNote: 'Used with permission',
+      isPrimary: true,
+      sortOrder: index,
+    })),
+    sources: Object.values(SEED_MODEL_IDS).map((modelId) => ({
+      id: modelId.replace('55555555', 'ccccccc1'),
+      modelId,
+      kind: 'manufacturer' as const,
+      url: `https://example.com/instruments/${modelId}`,
+      publisher: 'Manufacturer catalog',
+      retrievedAt: VERIFIED_AT,
+      isPrimary: true,
+    })),
     questions: [
       { id: '77777777-7777-4777-8777-777777777701', key: 'level', required: 1, promptVi: 'Trình độ hiện tại của bạn?' },
       { id: '77777777-7777-4777-8777-777777777702', key: 'purpose', required: 1, promptVi: 'Bạn chơi kèn để làm gì?' },
@@ -345,9 +369,12 @@ export async function seedDatabase(db: Database): Promise<void> {
     )
     .onConflictDoNothing();
 
+  await db.insert(brands).values(rows.brands).onConflictDoNothing();
   await db.insert(instrumentFamilies).values(rows.families).onConflictDoNothing();
   await db.insert(instrumentModels).values(rows.models).onConflictDoNothing();
   await db.insert(pricePoints).values(rows.prices).onConflictDoNothing();
+  await db.insert(modelImages).values(rows.images).onConflictDoNothing();
+  await db.insert(sources).values(rows.sources).onConflictDoNothing();
 
   const bachYamahaPair = normalizeModelPair(SEED_MODEL_IDS.yamahaTrumpetStudent, SEED_MODEL_IDS.bachTrumpetPro);
 

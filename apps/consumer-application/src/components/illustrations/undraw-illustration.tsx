@@ -1,3 +1,5 @@
+import type { JSX } from 'react';
+
 import chattingSvg from '#/assets/illustrations/undraw-chatting.svg?raw';
 import composeMusicSvg from '#/assets/illustrations/undraw-compose-music.svg?raw';
 import formsSvg from '#/assets/illustrations/undraw-forms.svg?raw';
@@ -14,7 +16,12 @@ const ILLUSTRATIONS = {
 
 type UndrawName = keyof typeof ILLUSTRATIONS;
 
-function UndrawIllustration({ className, name }: { className?: string; name: UndrawName }) {
+type UndrawIllustrationProps = {
+  className?: string;
+  name: UndrawName;
+};
+
+function UndrawIllustration({ className, name }: UndrawIllustrationProps): JSX.Element {
   return (
     <span
       aria-hidden="true"
