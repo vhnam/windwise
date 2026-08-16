@@ -1,5 +1,14 @@
 # @windwise/ai
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [5cd17c4]
+  - @windwise/schemas@0.4.0
+  - @windwise/db@0.4.0
+  - @windwise/core@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes

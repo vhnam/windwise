@@ -1,5 +1,18 @@
 # @windwise/core
 
+## 0.4.0
+
+### Minor Changes
+
+- 5cd17c4: Add published catalog listing and instrument detail pages with
+  family/facet filters, shared Breadcrumb primitives, and catalog query/schema
+  helpers for browseable models, variants, and street-price ranges.
+
+### Patch Changes
+
+- Updated dependencies [5cd17c4]
+  - @windwise/schemas@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
