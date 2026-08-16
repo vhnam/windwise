@@ -46,6 +46,10 @@ catalog:
   valibot: ^1.4.2
   vite: npm:@voidzero-dev/vite-plus-core@0.2.9
   vite-plus: 0.2.9
+  drizzle-orm: ^0.44.5
+  drizzle-kit: ^0.31.4
+  postgres: ^3.4.7
+  zustand: ^5.0.8
 
 catalogMode: prefer
 
