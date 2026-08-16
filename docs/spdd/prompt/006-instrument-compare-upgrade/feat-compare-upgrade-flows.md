@@ -13,12 +13,12 @@ consultation engine — a compare flow that resolves free-text mentions of named
 instrument models to confirmed catalog references and renders a structured,
 priority-scoped side-by-side comparison, and an upgrade flow that resolves a
 visitor's stated current instrument to a confirmed family/tier and produces a
-same-family, same-or-higher-tier recommendation by skipping straight past the
-engine's family-selection stage — both sitting behind an upfront, sticky
-discover/compare/upgrade intent choice, both refusing to act on any model
-reference the visitor has not explicitly confirmed in the current session, and
-both reusing 005's session model, catalog, and recommendation engine and 008's
-catalog data rather than duplicating any of them.
+same-family, same-or-higher-tier recommendation without repeating family
+questions the visitor has already effectively answered — both sitting behind an
+upfront, sticky discover/compare/upgrade intent choice, both refusing to act on
+any model reference the visitor has not explicitly confirmed in the current
+session, and both reusing 005's session model, catalog, and recommendation
+engine and 008's catalog data rather than duplicating any of them.
 
 ## Entities
 
@@ -73,8 +73,7 @@ class ComparisonResult {
 
 class ComparedModel {
     +uuid modelId
-    +Specs specs
-    +Tier tier
+    +LevelTier levelTier
     +PricePoint price
 }
 
@@ -97,7 +96,7 @@ class ModelComparisonNote {
     +NoteAspect aspect
     +string noteVi
     +string noteEn
-    +uuid sourceId
+    +string sourceUrl
     +string author
     +string reviewedBy
     +timestamp publishedAt
@@ -115,12 +114,13 @@ class UpgradeCriteria {
     +uuid currentModelId
     +string reason
     +Level currentLevel
+    +Purpose purpose
     +Budget upgradeBudget
 }
 
 class FamilyTierFloor {
-    +Family family
-    +Tier minTier
+    +uuid familyId
+    +LevelTier minTier
     +boolean currentIsRecommendable
 }
 
@@ -132,10 +132,10 @@ class UpgradeRecommendation {
 
 class InstrumentModel {
     +uuid id
-    +Family family
-    +Tier tier
+    +uuid familyId
+    +LevelTier levelTier
     +string displayName
-    +boolean discontinued
+    +ModelStatus status
 }
 
 class RecommendationItem {
@@ -166,13 +166,14 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
 1. **Three guarded entry points, one engine**: Compare and upgrade are new
    branches into 005's single consultation engine, not a second recommendation
    system. `ConsultationSession.intent` (`discover | compare | upgrade`) is set
-   once at session creation and never changes mid-session — no free-text
-   inference switches a session's intent after the fact, matching 005's session
-   bootstrap shape.
+   once at session creation and never changes mid-session — this enum already
+   exists on `consultation_sessions` (005 anticipated it), so no session-schema
+   migration is needed, only the new branch handling.
 
 2. **Deterministic mention resolution, never LLM guessing**: `resolveMention()`
    in `@windwise/core` performs deterministic fuzzy matching against
-   `model_aliases` and catalog `display_name`, returning a ranked
+   `model_aliases` and catalog `display_name` (across all `status` values, so an
+   archived current instrument is still resolvable), returning a ranked
    `MentionCandidate[]`. It never collapses to a single auto-selected match
    regardless of confidence — the LLM tool layer only calls this function and
    surfaces its ranked output; it does not itself decide which model was meant.
@@ -185,14 +186,29 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
    state ("the LLM believes X was confirmed" is not a valid confirmation
    source).
 
-4. **Upgrade reuses discover's scoring path, skips only Stage A**:
-   `suggestUpgrade()` derives a `FamilyTierFloor` from the confirmed current
-   instrument (family + tier), then calls the same `recommend()` scoring
-   pipeline 005's discover flow uses, entering directly at the tier-constrained
-   candidate-selection stage. Family-selection scoring (Stage A) is skipped
-   entirely — never re-implemented, never re-derived by a second scorer. The
-   discontinued current instrument is resolved and used to derive the floor but
-   is excluded from the returned candidate set.
+4. **Upgrade reuses `recommend()` unmodified, through input scoping, not a
+   staged entry point**: 005's actual `recommend(criteria, catalog, ruleSet)` in
+   `packages/core/src/recommend.ts` is a single-pass function — it filters the
+   whole published catalog against budget/rules/section-preference in one loop
+   and has no separable "family-selection" vs. "candidate-selection" stage to
+   enter directly. `suggestUpgrade()` instead achieves "family already decided"
+   purely through its inputs:
+   - it derives a `FamilyTierFloor` from the confirmed current instrument's
+     `familyId`/`levelTier`;
+   - it sets `criteria.sectionPreference` to that family, reusing
+     `recommend()`'s existing `matchesSectionPreference()` filter — the exact
+     same mechanism a visitor's stated family preference already uses in
+     discover;
+   - it passes a `CatalogSnapshot` whose `models` are additionally pre-filtered
+     to `levelTier >= floor.minTier` within that family (a new filter, since
+     `recommend()` has no built-in tier floor — rules only target
+     `family | model | brand`, not tier);
+   - it then calls the unmodified `recommend()` against that scoped input.
+     `recommend()` itself is never modified, and no second scorer is written.
+     The possibly-archived current instrument is resolved (by id, regardless of
+     `status`) to derive the floor but is always excluded from the returned
+     candidate set — both because it is filtered out by id and because
+     `recommend()` only considers `status === 'published'` models.
 
 5. **Comparison notes are looked up, never generated**: `compareModelsCore()`
    performs a pure diff of `instrument_models` + `price_points` for the
@@ -227,10 +243,15 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
   `(session_id, model_id)` pair and never updated.
 - `ComparisonResult` and `UpgradeCriteria`/`UpgradeRecommendation` (in-memory,
   `@windwise/schemas`) are pure function outputs of `compareModelsCore()` and
-  `suggestUpgrade()` respectively — both reuse 005's `Criteria.level` and
-  `Criteria.budget` enums rather than defining parallel ones.
+  `suggestUpgrade()` respectively — both reuse 005's `Criteria.level`,
+  `Criteria.purpose`, and `Criteria.budget` enums (from
+  `packages/schemas/src/criteria.ts`) rather than defining parallel ones.
+  `purpose` is required in `UpgradeCriteria` because `suggestUpgrade()` builds a
+  full `Criteria` object to pass into the unmodified `recommend()`, and
+  `Criteria.purpose` is a required field there.
 - `ConsultationSession.intent` and `reference_model_ids` extend 005's session
-  row; they are not a new session table.
+  row; `intent`'s `compare`/`upgrade` values already exist in the
+  `session_intent` pg enum — only `reference_model_ids` is a net-new column.
 
 ### Dependencies
 
@@ -240,20 +261,25 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
    workspace graph.
 2. `@windwise/core`'s new modules (`resolve-mention.ts`, `compare-models.ts`,
    `suggest-upgrade.ts`) depend on `@windwise/db` query functions and on 005's
-   existing `recommend()` / scoring stages in the same package — they must not
-   reimplement family/tier scoring.
+   existing `recommend()` in the same package — `suggest-upgrade.ts` imports and
+   calls `recommend()` unmodified; it must not reimplement or fork its
+   scoring/rule logic.
 3. `@windwise/db`'s new schema files (`model-aliases.ts`,
    `model-comparison-notes.ts`) depend on 005's `instrument_models` and
    `price_points` tables via foreign keys; new query files
-   (`fuzzy-match-catalog.ts`, `pin-reference-model.ts`,
-   `confirmed-model-ids.ts`) are additive to 005's query layer.
-4. `@windwise/ai`'s `tools.ts` gains four new tool definitions
+   (`fuzzy-match-catalog.ts`, `get-model-by-id.ts`, `pin-reference-model.ts`,
+   `confirmed-model-ids.ts`) are additive to 005's query layer
+   (`packages/db/src/queries/consultation.ts`).
+4. `@windwise/ai`'s `tools.ts`/`tool-defs.ts` gain four new tool definitions
    (`resolveMention`, `confirmMention`, `compareModels`, `suggestUpgrade`) that
    call into `@windwise/core`; the LLM layer must not perform resolution or
    scoring itself (AGENTS.md §10).
-5. This feature depends on 005 (guided-instrument-consultation, unbuilt as of
-   this analysis) and 008 (catalog-management-workflow) landing first — 006
-   extends packages 005 creates and cannot be implemented independently of them.
+5. This feature depends on 005 (guided-instrument-consultation) and 008
+   (catalog-management-workflow), both already built —
+   `packages/db/src/schema/{catalog,consultation}.ts`,
+   `packages/core/src/recommend.ts`, and `packages/ai/src/{tools,tool-defs}.ts`
+   all exist and are the actual surface this feature extends. 006 is purely
+   additive on top of them.
 6. `packages/ui` gains no new domain components; it stays domain-free per
    AGENTS.md §9 — comparison table and intent-choice screens live in
    `apps/consumer-application`, composed from existing `@windwise/ui`
@@ -265,7 +291,8 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
    Valibot shapes for tool inputs/outputs; no persistence, no side effects.
 2. **Engine layer** (`@windwise/core`): pure, deterministic functions
    (`resolveMention`, `compareModelsCore`, `suggestUpgrade`) alongside 005's
-   `recommend()` — same purity/determinism contract, golden-file tested.
+   unmodified `recommend()` — same purity/determinism contract, golden-file
+   tested.
 3. **Persistence layer** (`@windwise/db`): Drizzle schema + query functions;
    owns the confirmation gate's source of truth (`confirmed-model-ids.ts`).
 4. **Tool layer** (`@windwise/ai`): exposes the engine functions as LLM tool
@@ -282,25 +309,69 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
 
 1. Responsibility: Define input/output Valibot shapes for mention resolution and
    confirmation (spec FR-002, FR-003).
-2. Exports:
-   - `MentionInput = v.object({ sessionId: v.string([v.uuid()]), rawText: v.string([v.minLength(1)]) })`
-   - `MentionCandidateSchema = v.object({ modelId: v.string([v.uuid()]), displayName: v.string(), confidence: v.number([v.minValue(0), v.maxValue(1)]), matchedAlias: v.string() })`
-   - `ConfirmInput = v.object({ sessionId: v.string([v.uuid()]), modelId: v.string([v.uuid()]) })`
-3. Constraints: no default export; reuse 005's `v.string([v.uuid()])` pattern if
-   already established there rather than inventing a new uuid validator.
+2. Exports (as shipped):
+   - `MentionInput = v.object({ sessionId: v.string(), rawText: v.pipe(v.string(), v.minLength(1)) })`
+   - `MentionCandidateSchema = v.object({ modelId: v.string(), displayName: v.string(), confidence: v.pipe(v.number(), v.minValue(0), v.maxValue(1)), matchedAlias: v.string() })`
+   - `ConfirmInput = v.object({ sessionId: v.string(), modelId: v.string() })`
+   - `ConfirmOutputSchema = v.object({ confirmed: v.literal(true), modelId: v.string() })`
+     — the `confirmMention` tool's return shape; added during implementation,
+     not originally called out here.
+   - `RawCandidateRowSchema = v.object({ modelId: v.string(), displayName: v.string(), matchedAlias: v.string(), similarity: v.number() })`
+     — the shape `fuzzyMatchCatalog()` returns and `resolveMention()` consumes;
+     added during implementation as the explicit boundary type between the db
+     query and the core ranking function (previously only referenced generically
+     as `RawCandidateRow[]`).
+3. Constraints: no default export. Ids are plain `v.string()` — this codebase
+   has no established `v.uuid()` validator (see
+   `packages/schemas/src/recommendation.ts`), so don't invent one. Pipe
+   validators use `v.pipe(...)`, matching `packages/schemas/src/catalog.ts`'s
+   existing style, not the array-form `v.string([...])` syntax.
 
 ### Create Schema - `packages/schemas/src/comparison.ts`
 
 1. Responsibility: Define shapes for `CompareInput`, `ComparisonResult`,
    `UpgradeCriteria` (spec FR-004, FR-006, FR-008).
-2. Exports:
-   - `CompareInput = v.object({ sessionId: v.string([v.uuid()]), modelIds: v.array(v.string([v.uuid()]), [v.minLength(2)]), priority: v.optional(ComparisonAspectEnum) })`
+2. Exports (as shipped):
+   - `CompareInput = v.object({ sessionId: v.string(), modelIds: v.pipe(v.array(v.string()), v.minLength(2)), priority: v.optional(ComparisonAspectEnum) })`
    - `ComparisonAspectEnum = v.picklist(['tone', 'weight_response', 'projection', 'budget'])`
-   - `ComparisonResultSchema` mirrors data-model.md's `ComparisonResult` shape
-     (`models`, `notes`, `highlightedAspects`)
-   - `UpgradeCriteriaSchema = v.object({ sessionId: v.string([v.uuid()]), currentModelId: v.string([v.uuid()]), reason: v.string(), currentLevel: /* reuse 005's Criteria.level enum */, upgradeBudget: /* reuse 005's Criteria.budget enum */ })`
-3. Constraints: `currentLevel`/`upgradeBudget` MUST import and reuse 005's
-   `Criteria` enums, not redeclare parallel ones (research.md decision).
+   - `NoteAspectEnum = v.picklist(['tone', 'weight_response', 'projection', 'general'])`
+     — separate from `ComparisonAspectEnum` because a note's `general` aspect
+     has no corresponding visitor-facing priority option.
+   - `ComparedModelSchema` —
+     `{ modelId, specs: { displayName, modelCode, familyId, sourceUrl }, tier: LevelTierSchema, price: v.optional(PricePointSchema) }`.
+     `price` is optional because `selectPrice()` can return `undefined` for a
+     model with no current price row; the original spec implied price is always
+     present.
+   - `ComparisonNoteViewSchema = v.object({ aspect: NoteAspectEnum, noteVi: v.string(), noteEn: v.string() })`
+   - `ComparisonResultSchema = v.object({ models: v.array(ComparedModelSchema), notes: v.array(ComparisonNoteViewSchema), highlightedAspects: v.array(ComparisonAspectEnum) })`
+   - `UnconfirmedReferenceErrorSchema = v.object({ error: v.literal('unconfirmed_reference'), modelId: v.string() })`
+     — the confirmation-gate refusal shape, shared by both `compareModels` and
+     `suggestUpgrade`.
+   - `CompareModelsOutputSchema = v.union([ComparisonResultSchema, UnconfirmedReferenceErrorSchema])`
+     — `compareModels` always **returns** this union, it never throws; the
+     original Operations text for the `compareModels` tool below said
+     "throws/returns," which this schema resolves in favor of always returning.
+   - `ModelComparisonNoteSchema` — mirrors the db row (`id`, `modelAId`,
+     `modelBId`, `aspect`, `noteVi`, `noteEn`, `sourceUrl`, `author`,
+     `reviewedBy`, `publishedAt`); added as the `@windwise/schemas` boundary
+     type between `packages/db`'s `model_comparison_notes` rows and
+     `compareModelsCore()`'s input, not originally itemized here.
+   - `UpgradeCriteriaSchema = v.object({ sessionId: v.string(), currentModelId: v.string(), reason: v.string(), currentLevel: LevelSchema, purpose: PurposeSchema, upgradeBudget: BudgetSchema })`
+     — `LevelSchema`/`PurposeSchema`/`BudgetSchema` imported from
+     `@windwise/schemas`'s existing `criteria.ts`.
+   - `FamilyTierFloorSchema = v.object({ familyId: v.string(), minTier: LevelTierSchema, currentIsRecommendable: v.boolean() })`
+   - `UpgradeRecommendationSchema = v.object({ items: v.array(PublicRecommendationItemSchema), floor: FamilyTierFloorSchema, hasQualifyingCandidate: v.boolean() })`
+     — `items` reuses 005's existing `PublicRecommendationItemSchema` from
+     `recommendation.ts` rather than a new `RecommendationItem` shape.
+   - `SuggestUpgradeOutputSchema = v.union([UpgradeRecommendationSchema, UnconfirmedReferenceErrorSchema])`
+     — same always-return-never-throw pattern as `CompareModelsOutputSchema`.
+3. Constraints: `currentLevel`/`purpose`/`upgradeBudget` MUST import and reuse
+   005's `Criteria` enums, not redeclare parallel ones. `purpose` is required
+   (not optional) because `suggest-upgrade.ts` builds a full `Criteria` object
+   for `recommend()`, which requires it. Confirmation-gate refusals are a typed
+   union member of the tool's output schema, not a thrown error — this is the
+   authoritative resolution of the "throws/returns" ambiguity in the AI Tool
+   operation below.
 
 ### Create Db Schema - `packages/db/src/schema/model-aliases.ts`
 
@@ -308,8 +379,9 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
 2. Definition: Drizzle
    `pgTable('model_aliases', { id: uuid().primaryKey().defaultRandom(), modelId: uuid('model_id').notNull().references(() => instrumentModels.id), alias: text().notNull(), locale: text().notNull() })`
    with a unique index on `(alias, locale)`.
-3. Constraints: `modelId` FK to 005's `instrument_models` table; do not
-   duplicate the FK target as a new models table.
+3. Constraints: `modelId` FK to 005's `instrument_models` table (defined in
+   `packages/db/src/schema/catalog.ts`); do not duplicate the FK target as a new
+   models table.
 
 ### Create Db Schema - `packages/db/src/schema/model-comparison-notes.ts`
 
@@ -318,11 +390,15 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
 2. Definition: Drizzle `pgTable('model_comparison_notes', ...)` with
    `modelAId`/`modelBId` uuid FKs, `aspect` as a pgEnum
    (`tone | weight_response | projection | general`), `noteVi`/`noteEn` text,
-   `sourceId` FK to `sources`, `author`/`reviewedBy` text, `publishedAt`
-   nullable timestamp.
+   `sourceUrl` text, `author`/`reviewedBy` text, `publishedAt` nullable
+   timestamp.
 3. Constraints: writes MUST normalize `(modelAId, modelBId)` lesser-id-first
    (per data-model.md) so lookups are a single unordered-pair query; enforce via
    a check constraint or write-path normalization helper, not query-time `OR`.
+   No `sources` table exists in this codebase (catalog only carries a plain
+   `sourceUrl` text field on `instrument_models` — see `manufacturerSourceUrl()`
+   in `packages/db/src/queries/consultation.ts`); do not invent a `sources` FK —
+   follow that established plain-text-URL pattern instead.
 
 ### Create Db Query - `packages/db/src/queries/fuzzy-match-catalog.ts`
 
@@ -333,10 +409,24 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
 3. Logic: normalize `rawText` (lowercase, trim, strip punctuation) the same way
    aliases are seeded; run a bounded similarity query (e.g. trigram/`pg_trgm` or
    an indexed `ILIKE`+Levenshtein scoring depending on what 005's db setup
-   already provides); return rows with a raw similarity score, unranked.
+   already provides); return rows with a raw similarity score, unranked. Query
+   across `instrument_models` regardless of `status` (not just `published`,
+   unlike `getPublishedCatalog()`) — an upgrade flow's "current instrument" may
+   be `archived`, and it must still be resolvable by mention.
 4. Constraints: pure query function, no side effects; must produce the same
    ranked order for the same input against a fixed catalog snapshot (determinism
    requirement, plan.md TR-2).
+
+### Create Db Query - `packages/db/src/queries/get-model-by-id.ts`
+
+1. Responsibility: Fetch a single `instrument_models` row by id regardless of
+   `status`, for resolving a confirmed reference whose model may not be
+   `published` (e.g. an archived current instrument in the upgrade flow).
+2. Signature:
+   `async function getModelById(db: Database, modelId: string): Promise<InstrumentModel | undefined>`.
+3. Constraints: does not filter by `status`; `getPublishedCatalog()` (existing,
+   in `packages/db/src/queries/consultation.ts`) remains the only source for the
+   candidate set used by `recommend()`, unchanged.
 
 ### Create Db Query - `packages/db/src/queries/pin-reference-model.ts`
 
@@ -395,49 +485,85 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
 
 ### Create Core Function - `packages/core/src/suggest-upgrade.ts`
 
-1. Responsibility: Family/tier-constrained recommendation skipping Stage A (spec
-   FR-007, FR-009, FR-011).
+1. Responsibility: Family/tier-constrained recommendation that reuses
+   `recommend()` unmodified via input scoping (spec FR-007, FR-009, FR-011).
 2. Signature:
-   `function suggestUpgrade(currentModel: InstrumentModel, criteria: UpgradeCriteria, catalog: InstrumentModel[], prices: PricePoint[]): UpgradeRecommendation`.
+   `function suggestUpgrade(currentModel: InstrumentModel, criteria: UpgradeCriteria, catalog: CatalogSnapshot, ruleSet: RuleSet): UpgradeRecommendation`.
 3. Logic:
-   - Derive `FamilyTierFloor` from `currentModel.family`/`currentModel.tier`;
-     set `currentIsRecommendable = !currentModel.discontinued`.
-   - Filter `catalog` to `family === floor.family && tier >= floor.minTier`,
-     excluding `currentModel.id` itself always (whether discontinued or not).
-   - Call into 005's existing scoring pipeline (`recommend()`'s post-Stage-A
-     entry point) against the filtered candidate set and
-     `criteria.currentLevel`/`criteria.upgradeBudget` — do not re-derive family
-     scoring.
+   - Derive `FamilyTierFloor` from
+     `currentModel.familyId`/`currentModel.levelTier` using the fixed tier order
+     `['student', 'intermediate', 'professional', 'custom']`; set
+     `currentIsRecommendable = currentModel.status === 'published'`.
+   - Build a `CatalogSnapshot` copy whose `models` are filtered to
+     `familyId === floor.familyId && tierRank(levelTier) >= tierRank(floor.minTier)`,
+     always excluding `currentModel.id` itself (whether `published` or not);
+     `families`/`prices` pass through unchanged.
+   - Construct a full `Criteria` object —
+     `{ level: criteria.currentLevel, purpose: criteria.purpose, budget: criteria.upgradeBudget, sectionPreference: <current family's slug or section> }`
+     — and call the unmodified
+     `recommend(fullCriteria, filteredCatalog, ruleSet)` imported from
+     `packages/core/src/recommend.ts`. Setting `sectionPreference` reuses
+     `recommend()`'s existing `matchesSectionPreference()` filter as a
+     defense-in-depth family lock, on top of the catalog pre-filter.
+     `recommend()` already filters to `status === 'published'`, so an archived
+     current instrument is excluded from candidates as a side effect of that
+     filter too. Do not re-derive or duplicate any of `recommend()`'s
+     scoring/rule logic here.
    - Set `hasQualifyingCandidate = items.length > 0`; when `false`, return an
      empty `items` array rather than relaxing the floor or returning lower-tier
      candidates (spec FR-011).
-4. Constraints: MUST NOT call any family-selection scoring stage; MUST NOT
-   return a candidate outside `floor.family`/`floor.minTier` under any
-   circumstance, including when `hasQualifyingCandidate` is false.
+4. Constraints: MUST NOT reimplement or fork any part of `recommend()`'s
+   scoring; MUST NOT modify `packages/core/src/recommend.ts`; MUST NOT return a
+   candidate outside `floor.familyId`/`floor.minTier` under any circumstance,
+   including when `hasQualifyingCandidate` is false — this is enforced entirely
+   by the pre-filter and `sectionPreference`, since `recommend()` never sees
+   out-of-scope candidates.
 
-### Update Ai Tool - `packages/ai/src/tools.ts`
+### Update Ai Tool - `packages/ai/src/tools.ts`, `packages/ai/src/tool-defs.ts`
 
 1. Responsibility: Expose `resolveMention`, `confirmMention`, `compareModels`,
    `suggestUpgrade` as LLM-callable tools, enforcing the confirmation gate
    server-side (spec FR-003, FR-010; plan.md constraint).
-2. Additions (alongside 005's existing tool definitions):
+2. Additions (alongside 005's existing `collectAnswers`/`recommendInstruments`
+   tool definitions):
    - `resolveMention(input: MentionInput)`: calls `fuzzyMatchCatalog` then
      `resolveMention()` core function; returns `MentionCandidate[]`. Never
      auto-confirms.
    - `confirmMention(input: ConfirmInput)`: calls `pinReferenceModel`; returns
      `{ confirmed: true, modelId }`.
-   - `compareModels(input: CompareInput)`: first calls
-     `confirmedModelIds(sessionId)`; if any `input.modelIds` entry is absent
-     from that set, throws/returns a structured refusal
-     (`{ error: 'unconfirmed_reference', modelId }`) and does not proceed.
-     Otherwise fetches models/prices/notes and calls `compareModelsCore`.
-   - `suggestUpgrade(input: UpgradeCriteriaSchema)`: same confirmation-gate
-     check on `currentModelId` first; on pass, fetches catalog/prices and calls
-     `suggestUpgrade` core function.
+   - `compareModels(input: CompareInput): Promise<CompareModelsOutput>`: first
+     calls `confirmedModelIds(sessionId)`; if any `input.modelIds` entry is
+     absent from that set, **returns** (never throws)
+     `{ error: 'unconfirmed_reference', modelId }` — the
+     `CompareModelsOutputSchema` union — and does not proceed. Otherwise fetches
+     models/prices/notes and calls `compareModelsCore`.
+   - `suggestUpgrade(input: UpgradeCriteria): Promise<SuggestUpgradeOutput>`:
+     same confirmation-gate check on `currentModelId` first, same
+     return-never-throw refusal shape; if `getModelById` finds nothing for
+     `currentModelId` (should not happen once confirmed, but the tool checks
+     anyway) it also returns the `unconfirmed_reference` refusal rather than
+     throwing. On pass, fetches the current model via `getModelById` (regardless
+     of status), fetches the published `CatalogSnapshot` via the existing
+     `getPublishedCatalog()` and rule set via `getPublishedRuleSet()` (both
+     already used by 005's `recommendInstruments` tool), and calls the
+     `suggestUpgrade` core function with them.
 3. Constraints: the confirmation-gate check MUST be the same
    `confirmed-model-ids.ts` call in both `compareModels` and `suggestUpgrade` —
    no duplicated inline query. The LLM must never be trusted to have "already
    confirmed" a model; this check runs unconditionally on every call.
+
+### Component organization (as shipped)
+
+Route files under
+`apps/consumer-application/src/routes/{consult,compare,upgrade}/` stay thin
+(TanStack Router loaders/actions only); the actual UI composition lives in
+sibling `apps/consumer-application/src/modules/<flow>-page/` directories —
+`intent-page/`, `compare-page/`, `upgrade-page/`, `consult-page/`, plus a shared
+`mention-flow/` module holding the resolve → confirm components reused by both
+compare and upgrade (per the "shared, not forked" constraint below). This
+mirrors the existing `home-page/`, `form-page/`, `result-page/` module
+convention from 004/005 — not called out explicitly in the original Operations
+below, which only specified route responsibilities.
 
 ### Create Route - `apps/consumer-application/src/routes/consult/intent.tsx`
 
@@ -445,7 +571,8 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
 2. Logic: renders three options (via `@windwise/ui` `Card`/`Tabs`); selecting
    one creates/updates the session's `intent` field once via a server function,
    then navigates into the matching flow (`discover` → existing 005 route
-   unchanged; `compare` → `/compare`; `upgrade` → `/upgrade`).
+   unchanged; `compare` → `/compare`; `upgrade` → `/upgrade`). UI composition
+   lives in `modules/intent-page/`.
 3. Constraints: intent, once set, is not editable from this screen again in the
    same session; selecting "discover" must not alter any 005 route or component.
 
@@ -487,8 +614,9 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
      within your family/tier" message (`Notice`) — never a lateral/downgrade
      suggestion, never an empty-looking silent result.
 3. Constraints: must not present the family-selection questions from 005's
-   discover flow at any point in this route — Stage A is skipped both in logic
-   and in UI (no family question is ever asked here).
+   discover flow at any point in this route — family is fixed by the confirmed
+   current instrument both in logic (via `suggestUpgrade()`'s input scoping) and
+   in UI (no family question is ever asked here).
 
 ### Create Tests - `packages/core/src/__tests__/resolve-mention.test.ts`, `compare-models.test.ts`, `suggest-upgrade.test.ts`
 
@@ -503,10 +631,14 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
      string; `priority` changes `highlightedAspects` but never removes a
      `ComparedModel` or a spec/tier/price field.
    - `suggestUpgrade`: candidate outside family or below tier is never returned;
-     discontinued current instrument is excluded from candidates but still used
-     to derive the floor; empty catalog match yields
+     an archived (`status !== 'published'`) current instrument is excluded from
+     candidates but still used to derive the floor; empty catalog match yields
      `hasQualifyingCandidate: false` with an empty `items` array, not a thrown
-     error.
+     error. Since the family/tier boundary is enforced entirely by
+     `suggestUpgrade()`'s own pre-filter (not by `recommend()`), this suite is
+     the single point of test coverage for FR-009 and needs explicit
+     boundary-crossing cases (e.g. a same-family-lower-tier model, a
+     different-family-same-tier model), not just happy-path cases.
 3. Constraints: `import { describe, expect, it } from 'vite-plus/test'`; no
    network/db access — all inputs are in-memory fixtures.
 
@@ -546,8 +678,8 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
    names (`@windwise/schemas`, `@windwise/core`, `@windwise/db`, `@windwise/ai`,
    `@windwise/ui`, `@windwise/query`) — never relative `../../packages/...`
    paths across package boundaries. Within a package, follow that package's
-   existing `#/` alias convention where established (matches `packages/ui`'s
-   pattern).
+   existing `#/` alias convention where established (matches `packages/core`'s
+   and `packages/db`'s existing `#/...ts` imports).
 2. **Tests**: `vite-plus/test`
    (`import { describe, expect, it } from 'vite-plus/test'`). Pure-function
    tests live under each package's `src/__tests__/`; UI component/route tests,
@@ -581,7 +713,11 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
 1. **Functional**: Do not build a second recommendation/scoring system, a second
    confirmation-check implementation, or an LLM-driven entity resolver. Do not
    add a fourth intent beyond discover/compare/upgrade. Do not let `intent`
-   change after session creation.
+   change after session creation. Do not modify `packages/core/src/recommend.ts`
+   — `suggestUpgrade()` reuses it purely through scoped inputs
+   (`sectionPreference`
+   - pre-filtered `CatalogSnapshot`), never by editing its internals or adding a
+     staged entry point to it.
 2. **Performance**: `resolveMention`'s fuzzy match must stay within a single
    bounded, indexed query against the seed-scale `model_aliases` table — no new
    runtime dependency, no unbounded scan, and no added latency budget beyond one
@@ -591,11 +727,12 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
    from client-supplied or LLM-conversational state. No visitor can compare or
    get an upgrade recommendation for a model they have not explicitly confirmed
    in their own session.
-4. **Integration**: This feature must not begin implementation ahead of 005
-   (engine, catalog, session model) and 008 (catalog data) — both are currently
-   unbuilt; 006 extends their packages and cannot be sequenced independently.
-   `packages/ui` must not gain any new domain-specific component. Apps must not
-   import `shadcn`/`@base-ui/react` directly.
+4. **Integration**: 005 and 008 are already built in this codebase — this
+   feature is purely additive on top of `packages/db/src/schema/catalog.ts`,
+   `consultation.ts`, `packages/core/src/recommend.ts`, and
+   `packages/ai/src/tools.ts`/`tool-defs.ts`. `packages/ui` must not gain any
+   new domain-specific component. Apps must not import `shadcn`/`@base-ui/react`
+   directly.
 5. **Business rules**: Never auto-select a mention match. Never proceed on an
    unconfirmed reference. Never fabricate a playing-character note. Priority
    reorders comparison rows, never hides a spec/tier/price row or drops a model.
@@ -611,11 +748,13 @@ RecommendationItem "1" --> "1" InstrumentModel : identifies
    `ConfirmedReference` unique on `(session_id, model_id)`, insert-only, never
    updated. `ModelComparisonNote` pairs normalized lesser-id-first on write;
    only rows with a non-null `published_at` are ever returned to a comparison.
+   `ModelComparisonNote.sourceUrl` is plain text, not an FK — no `sources` table
+   exists in this codebase.
 8. **API constraints**: The four new tool schemas
    (`resolveMention`/`confirmMention`/`compareModels`/`suggestUpgrade`) are the
    only new public surface in `@windwise/ai`; do not rename or alter 005's
-   existing tool signatures as part of this work. `CompareInput.modelIds`
-   requires `minLength(2)`.
+   existing `collectAnswers`/`recommendInstruments` tool signatures as part of
+   this work. `CompareInput.modelIds` requires `minLength(2)`.
 9. **Verification gate**: `vp run -r test` and `vp check` must pass, with
    particular attention to the confirmation-gate integration test (FR-010,
    SC-002) and the mention/comparison/upgrade golden-file determinism tests
