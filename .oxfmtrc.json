@@ -40,6 +40,14 @@
                 "@windwise/query",
                 "@windwise/query/**",
                 "@windwise/ui/**",
+                "@windwise/schemas",
+                "@windwise/schemas/**",
+                "@windwise/core",
+                "@windwise/core/**",
+                "@windwise/db",
+                "@windwise/db/**",
+                "@windwise/ai",
+                "@windwise/ai/**",
                 "@windwise/vite-config",
                 "@windwise/vite-config/**"
               ]
@@ -80,6 +88,14 @@
           "@windwise/query",
           "@windwise/query/**",
           "@windwise/ui/**",
+          "@windwise/schemas",
+          "@windwise/schemas/**",
+          "@windwise/core",
+          "@windwise/core/**",
+          "@windwise/db",
+          "@windwise/db/**",
+          "@windwise/ai",
+          "@windwise/ai/**",
           "@windwise/vite-config",
           "@windwise/vite-config/**"
         ]
