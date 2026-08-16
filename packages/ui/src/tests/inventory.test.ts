@@ -10,6 +10,7 @@ const packageJsonPath = fileURLToPath(new URL('../../package.json', import.meta.
 const ALL_MODULES = [
   'avatar.tsx',
   'badge.tsx',
+  'breadcrumb.tsx',
   'button.tsx',
   'card.tsx',
   'chart.tsx',
