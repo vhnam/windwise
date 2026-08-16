@@ -89,6 +89,20 @@ export const recommendationRuns = pgTable('recommendation_runs', {
   noMatch: jsonb('no_match'),
 });
 
+export const confirmedReferences = pgTable(
+  'confirmed_references',
+  {
+    sessionId: uuid('session_id')
+      .notNull()
+      .references(() => consultationSessions.id),
+    modelId: uuid('model_id')
+      .notNull()
+      .references(() => instrumentModels.id),
+    confirmedAt: timestamp('confirmed_at', { withTimezone: true }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.sessionId, table.modelId] })],
+);
+
 export const recommendationItems = pgTable('recommendation_items', {
   id: uuid('id').primaryKey(),
   runId: uuid('run_id')

@@ -4,12 +4,15 @@ import type { Database } from '#/client.ts';
 import {
   instrumentFamilies,
   instrumentModels,
+  modelAliases,
+  modelComparisonNotes,
   pricePoints,
   questionSets,
   questions,
   ruleSets,
   rules,
 } from '#/schema/index.ts';
+import { normalizeModelPair } from '#/schema/model-comparison-notes.ts';
 
 export const SEED_QUESTION_SET_ID = '11111111-1111-4111-8111-111111111111';
 export const SEED_RULE_SET_ID = '22222222-2222-4222-8222-222222222222';
@@ -345,4 +348,57 @@ export async function seedDatabase(db: Database): Promise<void> {
   await db.insert(instrumentFamilies).values(rows.families).onConflictDoNothing();
   await db.insert(instrumentModels).values(rows.models).onConflictDoNothing();
   await db.insert(pricePoints).values(rows.prices).onConflictDoNothing();
+
+  const bachYamahaPair = normalizeModelPair(SEED_MODEL_IDS.yamahaTrumpetStudent, SEED_MODEL_IDS.bachTrumpetPro);
+
+  await db
+    .insert(modelAliases)
+    .values([
+      {
+        modelId: SEED_MODEL_IDS.bachTrumpetPro,
+        alias: 'bach 37',
+        locale: 'en',
+      },
+      {
+        modelId: SEED_MODEL_IDS.bachTrumpetPro,
+        alias: 'bach strad 37',
+        locale: 'en',
+      },
+      {
+        modelId: SEED_MODEL_IDS.bachTrumpetPro,
+        alias: '180s37',
+        locale: 'en',
+      },
+      {
+        modelId: SEED_MODEL_IDS.yamahaTrumpetStudent,
+        alias: 'ytr-2330',
+        locale: 'en',
+      },
+      {
+        modelId: SEED_MODEL_IDS.yamahaTrumpetStudent,
+        alias: 'ytr2330',
+        locale: 'en',
+      },
+      {
+        modelId: SEED_MODEL_IDS.yamahaTrumpetStudent,
+        alias: 'ytr-8335',
+        locale: 'en',
+      },
+    ])
+    .onConflictDoNothing();
+
+  await db
+    .insert(modelComparisonNotes)
+    .values({
+      modelAId: bachYamahaPair.modelAId,
+      modelBId: bachYamahaPair.modelBId,
+      aspect: 'tone',
+      noteVi: 'Bach 37 có âm sáng và tập trung hơn so với Yamaha học sinh.',
+      noteEn: 'The Bach 37 is brighter and more focused than the student Yamaha.',
+      sourceUrl: 'https://example.com/notes/bach-37-yamaha',
+      author: 'catalog',
+      reviewedBy: 'catalog',
+      publishedAt: VERIFIED_AT,
+    })
+    .onConflictDoNothing();
 }
