@@ -10,33 +10,80 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ConsultIndexRouteImport } from './routes/consult/index'
+import { Route as FormIndexRouteImport } from './routes/form/index'
+import { Route as ResultRunIdRouteImport } from './routes/result/$runId'
+import { Route as ApiConsultChatRouteImport } from './routes/api/consult/chat'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConsultIndexRoute = ConsultIndexRouteImport.update({
+  id: '/consult/',
+  path: '/consult/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FormIndexRoute = FormIndexRouteImport.update({
+  id: '/form/',
+  path: '/form/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResultRunIdRoute = ResultRunIdRouteImport.update({
+  id: '/result/$runId',
+  path: '/result/$runId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiConsultChatRoute = ApiConsultChatRouteImport.update({
+  id: '/api/consult/chat',
+  path: '/api/consult/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/result/$runId': typeof ResultRunIdRoute
+  '/consult/': typeof ConsultIndexRoute
+  '/form/': typeof FormIndexRoute
+  '/api/consult/chat': typeof ApiConsultChatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/result/$runId': typeof ResultRunIdRoute
+  '/consult': typeof ConsultIndexRoute
+  '/form': typeof FormIndexRoute
+  '/api/consult/chat': typeof ApiConsultChatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/result/$runId': typeof ResultRunIdRoute
+  '/consult/': typeof ConsultIndexRoute
+  '/form/': typeof FormIndexRoute
+  '/api/consult/chat': typeof ApiConsultChatRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    '/' | '/result/$runId' | '/consult/' | '/form/' | '/api/consult/chat'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/result/$runId' | '/consult' | '/form' | '/api/consult/chat'
+  id:
+    | '__root__'
+    | '/'
+    | '/result/$runId'
+    | '/consult/'
+    | '/form/'
+    | '/api/consult/chat'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ResultRunIdRoute: typeof ResultRunIdRoute
+  ConsultIndexRoute: typeof ConsultIndexRoute
+  FormIndexRoute: typeof FormIndexRoute
+  ApiConsultChatRoute: typeof ApiConsultChatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +95,43 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/consult/': {
+      id: '/consult/'
+      path: '/consult'
+      fullPath: '/consult/'
+      preLoaderRoute: typeof ConsultIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/form/': {
+      id: '/form/'
+      path: '/form'
+      fullPath: '/form/'
+      preLoaderRoute: typeof FormIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/result/$runId': {
+      id: '/result/$runId'
+      path: '/result/$runId'
+      fullPath: '/result/$runId'
+      preLoaderRoute: typeof ResultRunIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/consult/chat': {
+      id: '/api/consult/chat'
+      path: '/api/consult/chat'
+      fullPath: '/api/consult/chat'
+      preLoaderRoute: typeof ApiConsultChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ResultRunIdRoute: ResultRunIdRoute,
+  ConsultIndexRoute: ConsultIndexRoute,
+  FormIndexRoute: FormIndexRoute,
+  ApiConsultChatRoute: ApiConsultChatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
