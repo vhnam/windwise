@@ -31,7 +31,12 @@ export const Route = createRootRouteWithContext<QueryRouterContext>()({
     ],
   }),
   shellComponent: RootDocument,
+  notFoundComponent: NotFound,
 });
+
+function NotFound() {
+  return <p>Not Found</p>;
+}
 
 function RootDocument({ children }: PropsWithChildren) {
   return (
