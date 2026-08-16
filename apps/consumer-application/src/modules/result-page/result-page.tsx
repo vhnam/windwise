@@ -1,7 +1,6 @@
 import { Link } from '@tanstack/react-router';
 import {
   AlertTriangleIcon,
-  ArrowLeftIcon,
   CheckIcon,
   ClipboardListIcon,
   CopyIcon,
@@ -26,8 +25,9 @@ import {
 } from '@windwise/ui/components/card';
 import { Separator } from '@windwise/ui/components/separator';
 
+import { AppHeader } from '#/components/app-header';
 import { getOtherOptions, type SharedResult } from '#/lib/server/consultation';
-import { UndrawIllustration } from '#/modules/home-page/undraw-illustration';
+import { UndrawIllustration } from '#/modules/illustrations';
 
 const STALE_AFTER_MS = 180 * 24 * 60 * 60 * 1000;
 const INITIAL_VISIBLE = 3;
@@ -105,20 +105,11 @@ function ResultChrome({ children }: { children: ReactNode }) {
       </div>
 
       <div className="relative mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
-        <header className="flex items-center justify-between gap-4">
-          <Button
-            nativeButton={false}
-            variant="ghost"
-            className="h-11 min-h-11 px-2.5 text-sm font-semibold tracking-wide"
-            render={<Link to="/" />}
-          >
-            <ArrowLeftIcon data-icon="inline-start" aria-hidden="true" />
-            WindWise
-          </Button>
-          <Badge variant="outline">Kết quả tư vấn</Badge>
-        </header>
+        <AppHeader badge="Kết quả tư vấn" backTo="/" />
 
-        <main className="flex flex-1 flex-col gap-10 py-10 sm:gap-12 sm:py-14">{children}</main>
+        <main id="main-content" className="flex flex-1 flex-col gap-10 py-10 sm:gap-12 sm:py-14">
+          {children}
+        </main>
 
         <footer className="border-t border-border pt-6 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
           <p className="text-xs leading-relaxed text-muted-foreground">

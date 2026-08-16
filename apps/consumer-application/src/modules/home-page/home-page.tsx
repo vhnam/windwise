@@ -6,7 +6,8 @@ import { Button } from '@windwise/ui/components/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@windwise/ui/components/card';
 import { Separator } from '@windwise/ui/components/separator';
 
-import { UndrawIllustration, type UndrawName } from './undraw-illustration';
+import { AppHeader } from '#/components/app-header';
+import { UndrawIllustration, type UndrawName } from '#/modules/illustrations';
 
 type FeatureProps = {
   title: string;
@@ -42,12 +43,9 @@ function HomePage() {
       </div>
 
       <div className="relative mx-auto flex min-h-dvh w-full max-w-5xl flex-col px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
-        <header className="flex items-center justify-between gap-4">
-          <p className="font-heading text-sm font-semibold tracking-wide text-foreground">WindWise</p>
-          <Badge variant="outline">Tư vấn kèn hơi</Badge>
-        </header>
+        <AppHeader badge="Tư vấn kèn hơi" />
 
-        <main className="flex flex-1 flex-col gap-16 py-12 sm:gap-20 sm:py-16">
+        <main id="main-content" className="flex flex-1 flex-col gap-16 py-12 sm:gap-20 sm:py-16">
           <section className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:gap-14">
             <div className="flex flex-col gap-6 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-3 motion-safe:duration-500">
               <h1 className="font-heading text-4xl font-semibold tracking-tight text-balance sm:text-5xl lg:text-6xl">
@@ -65,7 +63,7 @@ function HomePage() {
                   render={<Link to="/consult" />}
                 >
                   <MessagesSquareIcon data-icon="inline-start" aria-hidden="true" />
-                  Bắt đầu hội thoại
+                  Bắt đầu tư vấn
                 </Button>
                 <Button
                   nativeButton={false}
@@ -163,7 +161,7 @@ function HomePage() {
                   className="h-11 min-h-11 px-4 text-sm"
                   render={<Link to="/consult" />}
                 >
-                  Bắt đầu hội thoại
+                  Bắt đầu tư vấn
                 </Button>
                 <Button
                   nativeButton={false}
