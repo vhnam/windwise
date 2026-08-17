@@ -814,8 +814,8 @@ release. Add a tool name to select part of the graph. For example, run
 
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **windwise** (3132 symbols, 5625
-relationships, 153 execution flows). Use the GitNexus MCP tools to understand
+This project is indexed by GitNexus as **windwise** (3329 symbols, 6176
+relationships, 166 execution flows). Use the GitNexus MCP tools to understand
 code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it
