@@ -139,10 +139,15 @@ class VerificationQueueItem {
 }
 
 class QueueReason {
-    <<enumeration>>
+    <<union>>
     stale
     missing_fields
     broken_source
+    +string lastVerifiedAt
+    +int daysOverThreshold
+    +string[] fields
+    +string sourceUrl
+    +string lastCheckedAt
 }
 
 class AuditLog {
@@ -221,6 +226,9 @@ Conservative-constraint notes:
   explicitly plural ("add comments") and not gated by a lifecycle transition.
 - `VerificationQueueItem` and `QueueReason` are in-memory query output
   (`@windwise/schemas`), never persisted tables, per data-model.md.
+  `QueueReason` is a Valibot `variant('type', …)` — `stale` carries
+  `lastVerifiedAt` and `daysOverThreshold`; `missing_fields` carries `fields`;
+  `broken_source` carries `sourceUrl` and `lastCheckedAt` — not a database enum.
 - `CanTransition` is a function, not a table — represented here to make the
   centralized-check architecture explicit in the entity graph.
 
@@ -306,7 +314,10 @@ Conservative-constraint notes:
     field-group cards (Identity, Pricing, Primary image, Source), and a sticky
     Information aside (id, version, last verified, completeness, history link,
     Archive). Primary image uses `@windwise/ui` `Attachment` primitives composed
-    in the dashboard module — not a new shared catalog widget.
+    in the dashboard module — not a new shared catalog widget. List, review,
+    verification, members, and audit screens reuse the same sticky page header
+    (Lucide icon, eyebrow, `h1`) and, where there is nothing to show, the
+    generic `@windwise/ui` `Empty` primitive — not a catalog-named empty widget.
 
 ## Structure
 
@@ -320,7 +331,8 @@ Conservative-constraint notes:
 - `VerificationQueueItem` and `AuditTrailEntry` are `@windwise/schemas`
   Valibot-validated shapes, never Drizzle table types — they are query output,
   not persisted rows, matching the existing pattern of `ListingResult`/
-  `DetailResult` in `packages/schemas/src/catalog-browsing.ts`.
+  `DetailResult` in `packages/schemas/src/catalog-browsing.ts`. `QueueReason` is
+  a discriminated union (`type`), not a Postgres enum.
 - `AuditLog.before`/`after` are `jsonb` diffs keyed by changed field name only
   (not full-row snapshots), consistent with FR-010's "before/after diff of
   changed fields."
@@ -342,10 +354,10 @@ Conservative-constraint notes:
 4. `apps/manager-dashboard` depends on `@windwise/db` (existing, extended with a
    write path), `@windwise/schemas` (existing, extended with new in-memory
    shapes), `@windwise/ui` (existing, dashboard theme plus generic primitives
-   such as `Attachment`, `Field`, `Card`, `Dialog` — no catalog-named
-   composites), `@windwise/query` (existing, TanStack Query helpers),
-   `better-auth` (existing dependency, organization plugin newly configured,
-   database adapter newly wired).
+   such as `Attachment`, `Pagination`, `Empty`, `Field`, `Card`, `Dialog` — no
+   catalog-named composites), `@windwise/query` (existing, TanStack Query
+   helpers), `better-auth` (existing dependency, organization plugin newly
+   configured, database adapter newly wired).
 5. `@windwise/db` depends on `better-auth`'s organization/member tables for
    `OrganizationMember` (extended, not duplicated) and owns `AuditLog`, the
    extended catalog tables, and `CatalogSettings` outright.
@@ -358,15 +370,19 @@ Conservative-constraint notes:
 
 1. **Route/dashboard layer** (`apps/manager-dashboard/src/routes/` plus
    `apps/manager-dashboard/src/modules/`): TanStack Start route modules stay
-   thin (loader + `component`). Product UI for catalog lives in
-   `src/modules/catalog/` (`catalog-list`, `catalog-edit`) and calls server
-   functions / query options only; never imports Drizzle or touches
-   `@windwise/db` internals directly.
+   thin (loader + `component`). Product UI lives in `src/modules/catalog/`
+   (`catalog-list`, `catalog-edit`, `catalog-review`, `catalog-verification`,
+   `catalog-audit`) and `src/modules/settings/members-settings/`. Client role
+   gates use `hasMinRole` (`src/lib/roles.ts`); actor context is loaded via
+   `getActorContextFn` (`src/lib/server/actor.ts`). Modules call server
+   functions / query options only; never import Drizzle or touch `@windwise/db`
+   internals directly.
 2. **Service layer** (`packages/db/src/authz/`, `packages/db/src/queries/`):
    `can-transition.ts`, `catalog-write.ts`, `verification-queue.ts`,
-   `audit-trail.ts`, `required-fields.ts`. This is where role checks, lifecycle
-   rules, and audit writes are centralized. Exposed to the route layer as
-   TanStack Start server functions. Existing read-only query functions
+   `audit-trail.ts`, `required-fields.ts`, `catalog-settings.ts`,
+   `organization-members.ts`. This is where role checks, lifecycle rules, and
+   audit writes are centralized. Exposed to the route layer as TanStack Start
+   server functions. Existing read-only query functions
    (`list-published-instruments.ts`, `get-instrument-detail.ts`,
    `list-catalog-facets.ts`, `get-model-by-id.ts`) are untouched by this layer —
    this spec adds write-side siblings, it does not modify them.
@@ -591,6 +607,47 @@ Conservative-constraint notes:
    size that makes the dashboard view unusable — if so, paginate with TanStack
    Router search params, not an arbitrary hard truncation.
 
+### Create Query - `packages/db/src/queries/catalog-settings.ts`
+
+1. Responsibility: Read/update org-scoped `stalenessThresholdDays` (FR-003 / US2
+   threshold).
+2. Signatures:
+   `getCatalogSettings(db, orgId): Promise<{ stalenessThresholdDays: number }>`
+   (defaults to 180 when no row exists);
+   `updateCatalogSettings(db, actorUserId, orgId, stalenessThresholdDays): Promise<WriteResult<{ stalenessThresholdDays: number }>>`.
+3. Logic: `updateCatalogSettings` re-reads the actor's `organization_members`
+   role; only `owner`/`admin` succeed; upserts on `organizationId`.
+4. Constraints: Integer range 1–3650 is enforced at the dashboard server
+   function (`valibot`) and again in the members-settings form; do not accept a
+   client-supplied role.
+
+### Create Query - `packages/db/src/queries/organization-members.ts`
+
+1. Responsibility: List org members and update a member's role (US3.4).
+2. Signatures:
+   `listOrganizationMembers(db, orgId): Promise<OrganizationMemberListItem[]>`;
+   `updateOrganizationMemberRole(db, actorUserId, orgId, userId, role): Promise<WriteResult<{ userId: string; role: Role }>>`.
+3. Logic: Join `organization_members` to better-auth `user` for `displayName`
+   and `email`. Role updates re-read the actor's current role; only
+   `owner`/`admin` succeed.
+4. Constraints: This is a query over the same physical members table the
+   organization plugin manages — not a second membership store.
+
+### Create Helper - `apps/manager-dashboard/src/lib/roles.ts`
+
+1. Responsibility: Client-side minimum-role comparison for hiding controls
+   (`hasMinRole(role, minimum)`). Rank: viewer < editor < reviewer < admin =
+   owner.
+2. Constraints: UI gating only. Every mutation still re-reads role in
+   `@windwise/db` (FR-012). Do not send `role` as a client argument to server
+   functions.
+
+### Create Server Function - `apps/manager-dashboard/src/lib/server/actor.ts`
+
+1. Responsibility: `getActorContextFn` GET server function wrapping
+   `getActorContext()` from `session.ts` so loaders can pass `{ role, … }` into
+   review/members modules without importing auth internals in the component.
+
 ### Update Auth Config - `apps/manager-dashboard/src/lib/auth.ts`
 
 1. Responsibility: Configure better-auth's organization plugin with the
@@ -607,19 +664,27 @@ Conservative-constraint notes:
    those are out of scope (spec Assumptions: "account creation/authentication
    mechanics themselves are out of scope").
 
-### Create Route - `apps/manager-dashboard/src/routes/catalog/index.tsx`
+### Create Route - `apps/manager-dashboard/src/routes/_protected/catalog/index.tsx`
 
-1. Responsibility: Record list with status filter (US1, plan.md structure).
-2. Logic: TanStack Query hook calling a server function wrapping a read query
-   over `instrument_models` filtered by `status` search param (TanStack Router
-   typed search params per plan.md's Technical Context); role-gated action
-   buttons (Edit only if actor role is editor+; the create button only if
-   editor+).
-3. Constraints: Read path only — no direct DB access from the route component;
-   reads status via the server function, not client-side. Replaces the current
-   placeholder `apps/manager-dashboard/src/routes/index.tsx` welcome content as
-   the app's real landing surface (existing index route content is out of scope
-   to preserve — it is scaffold boilerplate, not product content).
+1. Responsibility: Thin catalog list route (US1, plan.md structure).
+2. Logic: Typed search params `status` / `page`; `component` is `CatalogList`
+   from `#/modules/catalog/catalog-list`.
+3. Constraints: No table markup in the route file. Read path only — no direct DB
+   access from the route component. Replaces the current placeholder
+   `apps/manager-dashboard/src/routes/index.tsx` welcome content as the app's
+   real landing surface (existing index route content is out of scope to
+   preserve — it is scaffold boilerplate, not product content).
+
+### Create Module - `apps/manager-dashboard/src/modules/catalog/catalog-list/catalog-list.tsx`
+
+1. Responsibility: Paged catalog table with status filter (US1).
+2. Layout: Sticky `CatalogListHeader` (BookOpen icon, "Workspace" eyebrow,
+   "Catalog records" `h1`, editor+ **New record** with Plus icon — not a `+`
+   character). Filters + table in the padded body.
+3. Logic: `useCatalogListActions` + TanStack Table; Edit only if actor role is
+   editor+ (`hasMinRole`).
+4. Constraints: Role-gated actions are UI-only; writes go through catalog server
+   functions.
 
 ### Create Route - `apps/manager-dashboard/src/routes/_protected/catalog/$modelId/edit.tsx`
 
@@ -683,46 +748,92 @@ Conservative-constraint notes:
    `packages/ui`. Do not invent object storage in this module — persistence
    remains `ModelImage.url` via `catalog-write.ts`.
 
-### Create Route - `apps/manager-dashboard/src/routes/catalog/review/index.tsx`
+### Create Route - `apps/manager-dashboard/src/routes/_protected/catalog/review/index.tsx`
 
-1. Responsibility: Reviewer queue — in-review records (US1.2's "reviewer's
-   queue" resolved as a filtered list view, not a separate table, per strategic
-   analysis's noted gap).
-2. Logic: Server function query for `status = 'in_review'`; approve button calls
-   `transitionInstrumentModel(..., 'published')` (blocked with a missing-field
-   message if FR-009 rejects it); request-changes control requires a note field
-   and calls `transitionInstrumentModel(..., 'draft', note)`, which lands in
-   `InstrumentModel.reviewNotes`.
-3. Constraints: Only rendered/actionable for reviewer+ role — editor/viewer
-   sessions see a role-appropriate empty/denied state, not a broken page.
+1. Responsibility: Thin reviewer-queue route (US1.2's "reviewer's queue"
+   resolved as a filtered list view, not a separate table).
+2. Logic: Loader loads `listCatalogRecordsFn({ status: 'in_review' })` and
+   `getActorContextFn()`; `component` is `CatalogReview`.
+3. Constraints: No table or dialog markup in the route file.
 
-### Create Route - `apps/manager-dashboard/src/routes/verification-queue.tsx`
+### Create Module - `apps/manager-dashboard/src/modules/catalog/catalog-review/catalog-review.tsx`
+
+1. Responsibility: Reviewer queue UI — approve / request-changes (US1.2).
+2. Layout: Sticky `CatalogReviewHeader` (ListChecks icon, "Catalog" eyebrow,
+   "Reviewer queue" `h1`). Empty/denied states use `CatalogReviewEmpty` composed
+   from `@windwise/ui` `Empty` (`denied` lock icon; `idle` list-checks icon)
+   plus **Back to catalog**. Populated state: table of record name,
+   completeness, Request changes / Approve. Request-changes dialog requires a
+   note.
+3. Logic: `useCatalogReviewActions` — `hasMinRole(actor.role, 'reviewer')`;
+   approve calls `transitionStatusFn(..., 'published')`; request-changes calls
+   `transitionStatusFn(..., 'draft', note)` into `InstrumentModel.reviewNotes`.
+   Errors: `Cannot publish until required fields are saved.`;
+   `Someone else edited this record. Reload to see the latest version.`;
+   `That transition is not allowed for your role.`
+4. Constraints: Editor/viewer sessions see `CatalogReviewEmpty kind="denied"`,
+   not a broken page. Do not add a catalog-named empty widget to `@windwise/ui`.
+
+### Create Route - `apps/manager-dashboard/src/routes/_protected/verification-queue.tsx`
+
+1. Responsibility: Thin verification-queue route (US2).
+2. Logic: Loader calls `getVerificationQueueFn()`; `component` is
+   `CatalogVerification`.
+3. Constraints: No table markup in the route file. No client-side polling that
+   triggers live URL checks — reads only the precomputed `source_ok` flag.
+
+### Create Module - `apps/manager-dashboard/src/modules/catalog/catalog-verification/catalog-verification.tsx`
 
 1. Responsibility: Verification queue view (US2).
-2. Logic: Server function calling `getVerificationQueue(orgId)`; renders
-   grouped-by-record reason badges (stale / missing fields / broken source).
-3. Constraints: No client-side polling that triggers live URL checks — reads
-   only the precomputed `source_ok` flag.
+2. Layout: Sticky `CatalogVerificationHeader` (ShieldAlert icon, "Published
+   catalog" eyebrow, "Verification queue" `h1`). Empty: Card + ShieldCheck +
+   **Back to catalog**. Populated: Card table grouped by record; reason details
+   (stale days-over-threshold, named missing fields, broken source URL as
+   visible text); Open control per row.
+3. Logic: `useCatalogVerificationActions` reads loader `items`. Reason badges
+   use label + Lucide icon + variant (not color alone). Count line is
+   `role="status"` `aria-atomic="true"`.
+4. Constraints: Do not HEAD/GET source URLs from this page.
 
-### Create Route - `apps/manager-dashboard/src/routes/audit/$entityId.tsx`
+### Create Route - `apps/manager-dashboard/src/routes/_protected/audit/$entityId.tsx`
 
-1. Responsibility: Chronological diff view for one record (US4).
-2. Logic: Server function calling `getAuditTrail('instrument_model', entityId)`;
-   renders each entry's actor, timestamp, action, and field-level diff in order.
+1. Responsibility: Thin chronological diff route for one record (US4).
+2. Logic: Optional `page` search param; loader calls `getAuditTrailFn`;
+   `component` is `CatalogAudit`.
 3. Constraints: Read-only; viewable by all roles including Viewer (spec: Viewers
-   "can still read records").
+   "can still read records"). No diff markup in the route file.
 
-### Create Route - `apps/manager-dashboard/src/routes/settings/members.tsx`
+### Create Module - `apps/manager-dashboard/src/modules/catalog/catalog-audit/catalog-audit.tsx`
 
-1. Responsibility: Owner/Admin role-assignment UI (US3.4).
-2. Logic: Lists org members with current role; role-change control calls a
-   better-auth organization-plugin update; takes effect immediately because
-   `can-transition.ts` always re-reads the role at call time (no cache
-   invalidation step needed for correctness, though TanStack Query cache for the
-   members list itself should still invalidate on save).
-3. Constraints: Only rendered for owner/admin role. Also hosts the
-   `staleness_threshold_days` setting field (Approach: org-scoped,
-   Owner/Admin-editable).
+1. Responsibility: Paginated audit history with field diffs (US4).
+2. Layout: Sticky `CatalogAuditHeader` (back to the record). Empty: Card +
+   History icon + **Return to the record**. Populated: Card table; row opens a
+   diff dialog.
+3. Constraints: Append-only history; no mutation from this module.
+
+### Create Route - `apps/manager-dashboard/src/routes/_protected/settings/members.tsx`
+
+1. Responsibility: Thin Owner/Admin settings route (US3.4).
+2. Logic: Loader loads `listOrganizationMembersFn`, `getCatalogSettingsFn`,
+   `getActorContextFn`; `component` is `MembersSettings`.
+3. Constraints: No table or form markup in the route file.
+
+### Create Module - `apps/manager-dashboard/src/modules/settings/members-settings/members-settings.tsx`
+
+1. Responsibility: Role assignment and staleness threshold (US3.4, FR-003).
+2. Layout: Sticky `MembersSettingsHeader` (Users icon, "Organization" eyebrow,
+   "Members" `h1`). Denied: Card + Lock + **Back to catalog**. Manage: People
+   table (avatar, wrapping email, role Select) and Verification settings card
+   with a link to `/verification-queue`.
+3. Logic: `useMembersSettingsActions` — `hasMinRole(actor.role, 'admin')`;
+   `updateMemberRoleFn` / `updateCatalogSettingsFn`. Threshold: integer 1–3650;
+   validate on blur/save; inline
+   `Enter a whole number of days between 1 and 3650.`; toasts `Role updated`,
+   `You cannot change that member’s role.`, `Staleness threshold saved`,
+   `You cannot change catalog settings.`
+4. Constraints: Role changes take effect on the next mutation because
+   `can-transition.ts` re-reads the member row — invalidate the members loader
+   after save. Do not pass role from the client as an authorization claim.
 
 ### Create Tests - `packages/db/src/authz/can-transition.test.ts`
 
@@ -754,14 +865,28 @@ Conservative-constraint notes:
    appear; a record with multiple simultaneous reasons appears once with all
    reasons listed; archived record never appears even if previously flagged.
 
+### Create Tests - `packages/db/src/queries/catalog-settings.test.ts`
+
+1. Responsibility: Threshold read default and Owner/Admin-only update.
+2. Cases: missing row returns 180; non-admin update is `role-denied`; admin
+   upsert is visible on the next `getCatalogSettings` read.
+
+### Create Tests - `packages/db/src/queries/audit-trail.test.ts`
+
+1. Responsibility: Chronological mapping of `audit_logs` to `AuditTrailEntry`
+   (FR-011).
+2. Cases: empty entity; ordered entries with actor display name and field diffs.
+
 ### Create Changeset - `.changeset/catalog-management-workflow.md`
 
 1. Responsibility: Record shipped package/app changes per AGENTS.md §7.
 2. Content: `minor` for `@windwise/db` (new write-path public API surface:
    `catalog-write.ts`, `verification-queue.ts`, `audit-trail.ts`, `authz/`),
    `minor` for `@windwise/schemas` (new `VerificationQueueItem`/
-   `AuditTrailEntry` shapes), `minor` for `@windwise/manager-dashboard` (new
-   catalog/verification-queue/audit/settings routes and role-gated behavior).
+   `AuditTrailEntry` shapes), `minor` for `@windwise/ui` (generic `Attachment`,
+   `Pagination`, and `Empty` primitives), `minor` for
+   `@windwise/manager-dashboard` (new catalog/verification-queue/audit/settings
+   routes and role-gated behavior).
 3. Constraints: No `Co-authored-by` trailer (AGENTS.md §7). Follow the `0.y.z`
    baseline — do not jump to `1.0.0` for this feature alone.
 
@@ -808,16 +933,23 @@ Conservative-constraint notes:
    config invented for this work item.
 7. **No domain leakage into `@windwise/ui`**: Catalog/audit/verification-queue
    UI is dashboard-app-specific; only generic primitives (table, badge, dialog,
-   field, attachment) come from `@windwise/ui` — do not add `InstrumentCard`,
-   `AuditDiffView`, or `InstrumentImageUploader` to the shared UI package
-   (AGENTS.md §9), mirroring 007's identical rule for
-   `apps/consumer-application`'s catalog-page composites. The catalog editor
-   composes `Attachment` in
+   field, attachment, pagination, empty) come from `@windwise/ui` — do not add
+   `InstrumentCard`, `AuditDiffView`, `InstrumentImageUploader`, or
+   `CatalogEmptyState` to the shared UI package (AGENTS.md §9), mirroring 007's
+   identical rule for `apps/consumer-application`'s catalog-page composites. The
+   catalog editor composes `Attachment` in
    `apps/manager-dashboard/src/modules/catalog/catalog-edit/catalog-edit-fields.tsx`.
+   The reviewer queue composes `Empty` in
+   `apps/manager-dashboard/src/modules/catalog/catalog-review/catalog-review-empty.tsx`.
 8. **Editor forms**: Catalog create/edit uses `@formisch/react` with a Valibot
    schema colocated at
    `apps/manager-dashboard/src/schemas/catalog-edit.schema.ts`, matching
    login/forgot-password/reset-password — not Zustand.
+9. **Dashboard page chrome**: List, review, verification, members, audit, and
+   edit screens use a sticky page header (Lucide icon `aria-hidden`, eyebrow,
+   `h1` with `font-heading`). Product empty and permission-denied states use
+   `@windwise/ui` `Empty` (or the same Card empty pattern already used on audit
+   / verification) with a next action — not a one-line muted paragraph.
 
 ## Safeguards
 
@@ -861,7 +993,10 @@ Conservative-constraint notes:
    Cases) — restore is always an explicit Admin+ action. The staleness threshold
    is a per-organization, Owner/Admin-configurable setting (SPEC GAP resolved)
    and changing it must be reflected on the next verification-queue read, not
-   retroactively backfilled onto records.
+   retroactively backfilled onto records. The members-settings form rejects a
+   non-integer or out-of-range threshold with
+   `Enter a whole number of days between 1 and 3650.` before calling
+   `updateCatalogSettings`.
 6. **Technical constraints**: `@windwise/db` and `@windwise/schemas` already
    exist — do not re-scaffold them or duplicate their `package.json`/`tsconfig`
    setup; this work item only adds new files inside them. Optimistic concurrency
