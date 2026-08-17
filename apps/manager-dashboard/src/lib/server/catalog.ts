@@ -1,8 +1,8 @@
 import { createServerFn } from '@tanstack/react-start';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import * as v from 'valibot';
 
-import { LevelTierSchema, ModelStatusSchema } from '@windwise/schemas';
+import { LevelTierSchema, ModelStatusSchema, PriceScopeSchema, SourceKindSchema } from '@windwise/schemas';
 
 import { getActorContext } from '#/lib/server/session.ts';
 
@@ -10,23 +10,105 @@ const FORBIDDEN = { error: 'FORBIDDEN' } as const;
 const UNAUTHENTICATED = { error: 'FORBIDDEN' } as const;
 
 export const listCatalogRecordsFn = createServerFn({ method: 'GET' })
-  .validator(v.object({ status: v.optional(ModelStatusSchema) }))
+  .validator(
+    v.object({
+      status: v.optional(ModelStatusSchema),
+      page: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1))),
+      pageSize: v.optional(v.pipe(v.number(), v.integer(), v.minValue(1), v.maxValue(100))),
+    }),
+  )
   .handler(async ({ data }) => {
     const { getDb, instrumentModels } = await import('@windwise/db');
+    const { asc, count, eq } = await import('drizzle-orm');
     const db = getDb();
-    const rows = data.status
-      ? await db.select().from(instrumentModels).where(eq(instrumentModels.status, data.status))
-      : await db.select().from(instrumentModels);
-    return rows;
+    const statusFilter = data.status ? eq(instrumentModels.status, data.status) : undefined;
+
+    const [{ totalCount }] = await db.select({ totalCount: count() }).from(instrumentModels).where(statusFilter);
+    const shouldPaginate = data.page !== undefined || data.pageSize !== undefined;
+    const pageSize = shouldPaginate ? (data.pageSize ?? 20) : Math.max(totalCount, 1);
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
+    const page = shouldPaginate ? Math.min(data.page ?? 1, totalPages) : 1;
+
+    const items = await db
+      .select()
+      .from(instrumentModels)
+      .where(statusFilter)
+      .orderBy(asc(instrumentModels.displayName), asc(instrumentModels.id))
+      .limit(pageSize)
+      .offset((page - 1) * pageSize);
+
+    return { items, totalCount, page, pageSize };
   });
 
 export const getInstrumentRecordFn = createServerFn({ method: 'GET' })
   .validator(v.object({ modelId: v.string() }))
   .handler(async ({ data }) => {
-    const { getDb, instrumentModels } = await import('@windwise/db');
-    const [row] = await getDb().select().from(instrumentModels).where(eq(instrumentModels.id, data.modelId)).limit(1);
-    return row ?? null;
+    const { getDb, instrumentModels, modelImages, pricePoints, sources } = await import('@windwise/db');
+    const db = getDb();
+    const [row] = await db.select().from(instrumentModels).where(eq(instrumentModels.id, data.modelId)).limit(1);
+    if (!row) return null;
+
+    const [price] = await db
+      .select()
+      .from(pricePoints)
+      .where(and(eq(pricePoints.modelId, data.modelId), eq(pricePoints.isCurrent, true)))
+      .limit(1);
+    const [primaryImage] = await db
+      .select()
+      .from(modelImages)
+      .where(and(eq(modelImages.modelId, data.modelId), eq(modelImages.isPrimary, true)))
+      .limit(1);
+    const [source] = await db.select().from(sources).where(eq(sources.modelId, data.modelId)).limit(1);
+
+    return { ...row, price: price ?? null, primaryImage: primaryImage ?? null, source: source ?? null };
   });
+
+export const listBrandsFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const { getDb, brands } = await import('@windwise/db');
+  const { asc } = await import('drizzle-orm');
+  return getDb().select({ id: brands.id, name: brands.name }).from(brands).orderBy(asc(brands.name));
+});
+
+export const listFamiliesFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const { getDb, instrumentFamilies } = await import('@windwise/db');
+  const { asc } = await import('drizzle-orm');
+  return getDb()
+    .select({ id: instrumentFamilies.id, name: instrumentFamilies.nameEn })
+    .from(instrumentFamilies)
+    .orderBy(asc(instrumentFamilies.nameEn));
+});
+
+const CatalogPriceInputSchema = v.object({
+  scope: PriceScopeSchema,
+  amountMin: v.pipe(v.number(), v.minValue(0)),
+  amountMax: v.pipe(v.number(), v.minValue(0)),
+});
+
+const CatalogImageUrlSchema = v.pipe(
+  v.string(),
+  v.trim(),
+  v.union([v.pipe(v.string(), v.startsWith('data:image/')), v.pipe(v.string(), v.url())]),
+);
+
+const CatalogImageInputSchema = v.object({
+  url: CatalogImageUrlSchema,
+  altEn: v.string(),
+  altVi: v.optional(v.string()),
+  credit: v.string(),
+  licenseNote: v.optional(v.string()),
+});
+
+const CatalogSourceInputSchema = v.object({
+  kind: SourceKindSchema,
+  url: v.pipe(v.string(), v.url()),
+  publisher: v.string(),
+});
+
+const CatalogRelatedInputSchema = {
+  price: v.optional(CatalogPriceInputSchema),
+  primaryImage: v.optional(CatalogImageInputSchema),
+  source: v.optional(CatalogSourceInputSchema),
+};
 
 export const createInstrumentRecordFn = createServerFn({ method: 'POST' })
   .validator(
@@ -36,6 +118,7 @@ export const createInstrumentRecordFn = createServerFn({ method: 'POST' })
       modelCode: v.string(),
       displayName: v.string(),
       levelTier: LevelTierSchema,
+      ...CatalogRelatedInputSchema,
     }),
   )
   .handler(async ({ data }) => {
@@ -60,6 +143,7 @@ export const editInstrumentRecordFn = createServerFn({ method: 'POST' })
           modelCode: v.string(),
           displayName: v.string(),
           levelTier: LevelTierSchema,
+          ...CatalogRelatedInputSchema,
         }),
       ),
     }),
@@ -81,7 +165,7 @@ export const editInstrumentRecordFn = createServerFn({ method: 'POST' })
       if (result.reason === 'conflict') return { error: 'CONFLICT', currentVersion: result.currentVersion } as const;
       return FORBIDDEN;
     }
-    return { status: 'ok' } as const;
+    return { status: 'ok', version: data.expectedVersion + 1 } as const;
   });
 
 export const transitionStatusFn = createServerFn({ method: 'POST' })

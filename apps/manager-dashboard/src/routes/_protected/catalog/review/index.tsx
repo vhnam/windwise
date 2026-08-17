@@ -10,7 +10,7 @@ export const Route = createFileRoute('/_protected/catalog/review/')({
 });
 
 function ReviewQueueRoute() {
-  const records = Route.useLoaderData();
+  const { items: records } = Route.useLoaderData();
 
   return (
     <div className="p-8">
