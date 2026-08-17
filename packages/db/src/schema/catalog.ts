@@ -44,6 +44,10 @@ export const instrumentModels = pgTable('instrument_models', {
   status: modelStatusEnum('status').notNull(),
   lastVerifiedAt: timestamp('last_verified_at', { withTimezone: true }).notNull(),
   variantOfModelId: uuid('variant_of_model_id'),
+  dataCompleteness: integer('data_completeness').notNull().default(0),
+  verifiedByUserId: uuid('verified_by_user_id'),
+  reviewNotes: text('review_notes'),
+  version: integer('version').notNull().default(1),
 });
 
 export const pricePoints = pgTable('price_points', {
@@ -81,4 +85,7 @@ export const sources = pgTable('sources', {
   publisher: text('publisher').notNull(),
   retrievedAt: timestamp('retrieved_at', { withTimezone: true }).notNull(),
   isPrimary: boolean('is_primary').notNull().default(false),
+  backedFields: text('backed_fields').array().notNull().default([]),
+  sourceOk: boolean('source_ok'),
+  lastCheckedAt: timestamp('last_checked_at', { withTimezone: true }),
 });

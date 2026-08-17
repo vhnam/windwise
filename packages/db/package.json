@@ -17,11 +17,12 @@
     "check": "vp check",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "vp exec node --env-file-if-exists=.env --experimental-strip-types src/seed-cli.ts"
+    "db:seed": "vp exec node --env-file-if-exists=.env --env-file-if-exists=.env.local --experimental-strip-types src/seed-cli.ts"
   },
   "dependencies": {
     "@t3-oss/env-core": "catalog:",
     "@windwise/schemas": "workspace:*",
+    "better-auth": "^1.6.29",
     "drizzle-orm": "catalog:",
     "postgres": "catalog:",
     "valibot": "catalog:"

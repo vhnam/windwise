@@ -22,6 +22,20 @@
       "when": 1786896889301,
       "tag": "0002_wakeful_prodigy",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1786904200961,
+      "tag": "0003_worthless_sugar_man",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786976567625,
+      "tag": "0004_hesitant_wendell_vaughn",
+      "breakpoints": true
     }
   ]
 }
