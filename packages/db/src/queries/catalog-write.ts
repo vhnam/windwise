@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { and, eq } from 'drizzle-orm';
 
-import type { InstrumentModel, LifecycleStatus, Role, WriteResult } from '@windwise/schemas';
+import type { InstrumentModel, LifecycleStatus, PriceScope, Role, SourceKind, WriteResult } from '@windwise/schemas';
 
 import type { Database } from '#/client.ts';
 import { instrumentModels, modelImages, organizationMembers, pricePoints, sources } from '#/schema/index.ts';
@@ -11,17 +11,44 @@ import { canTransition } from '../auth/can-transition';
 import { computeDataCompleteness, computeMissingFields } from '../auth/required-fields';
 import { writeAuditEntry } from '../auth/write-audit-entry';
 
+export type CatalogPriceInput = {
+  scope: PriceScope;
+  amountMin: number;
+  amountMax: number;
+};
+
+export type CatalogImageInput = {
+  url: string;
+  altEn: string;
+  altVi?: string;
+  credit: string;
+  licenseNote?: string;
+};
+
+export type CatalogSourceInput = {
+  kind: SourceKind;
+  url: string;
+  publisher: string;
+};
+
+export type CatalogRelatedInput = {
+  price?: CatalogPriceInput;
+  primaryImage?: CatalogImageInput;
+  source?: CatalogSourceInput;
+};
+
 export type CreateInstrumentModelInput = {
   brandId: string;
   familyId: string;
   modelCode: string;
   displayName: string;
   levelTier: InstrumentModel['levelTier'];
-};
+} & CatalogRelatedInput;
 
 export type EditInstrumentModelPatch = Partial<
   Pick<CreateInstrumentModelInput, 'brandId' | 'familyId' | 'modelCode' | 'displayName' | 'levelTier'>
->;
+> &
+  CatalogRelatedInput;
 
 function toInstrumentModel(row: typeof instrumentModels.$inferSelect): InstrumentModel {
   return {
@@ -47,6 +74,105 @@ async function getCurrentRole(db: Database, actorUserId: string, orgId: string):
   return member?.role;
 }
 
+type RelatedIds = {
+  currentPrice: { id: string } | undefined;
+  primaryImage: { id: string } | undefined;
+  source: { id: string } | undefined;
+};
+
+async function getRelated(db: Database, modelId: string): Promise<RelatedIds> {
+  const [currentPrice] = await db
+    .select({ id: pricePoints.id })
+    .from(pricePoints)
+    .where(and(eq(pricePoints.modelId, modelId), eq(pricePoints.isCurrent, true)))
+    .limit(1);
+  const [primaryImage] = await db
+    .select({ id: modelImages.id })
+    .from(modelImages)
+    .where(and(eq(modelImages.modelId, modelId), eq(modelImages.isPrimary, true)))
+    .limit(1);
+  const [source] = await db.select({ id: sources.id }).from(sources).where(eq(sources.modelId, modelId)).limit(1);
+  return { currentPrice, primaryImage, source };
+}
+
+function completenessFrom(
+  model: {
+    brandId: string | null;
+    familyId: string | null;
+    modelCode: string | null;
+    displayName: string | null;
+  },
+  related: { hasCurrentPrice: boolean; hasPrimaryImage: boolean; hasSource: boolean },
+) {
+  const record = {
+    brandId: model.brandId,
+    familyId: model.familyId,
+    modelCode: model.modelCode,
+    displayName: model.displayName,
+    hasCurrentPrice: related.hasCurrentPrice,
+    hasPrimaryImage: related.hasPrimaryImage,
+    hasSource: related.hasSource,
+  };
+
+  return {
+    dataCompleteness: computeDataCompleteness(record),
+    missing: computeMissingFields('instrument_model', record),
+  };
+}
+
+async function upsertRelated(
+  tx: Pick<Database, 'insert' | 'update'>,
+  modelId: string,
+  existing: RelatedIds,
+  input: CatalogRelatedInput,
+) {
+  if (input.price) {
+    const values = {
+      scope: input.price.scope,
+      amountMin: String(input.price.amountMin),
+      amountMax: String(input.price.amountMax),
+      isCurrent: true,
+    };
+    if (existing.currentPrice) {
+      await tx.update(pricePoints).set(values).where(eq(pricePoints.id, existing.currentPrice.id));
+    } else {
+      await tx.insert(pricePoints).values({ id: randomUUID(), modelId, ...values });
+    }
+  }
+
+  if (input.primaryImage) {
+    const values = {
+      url: input.primaryImage.url,
+      altEn: input.primaryImage.altEn,
+      altVi: input.primaryImage.altVi ?? input.primaryImage.altEn,
+      credit: input.primaryImage.credit,
+      licenseNote: input.primaryImage.licenseNote ?? 'Used with permission',
+      isPrimary: true,
+      sortOrder: 0,
+    };
+    if (existing.primaryImage) {
+      await tx.update(modelImages).set(values).where(eq(modelImages.id, existing.primaryImage.id));
+    } else {
+      await tx.insert(modelImages).values({ id: randomUUID(), modelId, ...values });
+    }
+  }
+
+  if (input.source) {
+    const values = {
+      kind: input.source.kind,
+      url: input.source.url,
+      publisher: input.source.publisher,
+      retrievedAt: new Date(),
+      isPrimary: true,
+    };
+    if (existing.source) {
+      await tx.update(sources).set(values).where(eq(sources.id, existing.source.id));
+    } else {
+      await tx.insert(sources).values({ id: randomUUID(), modelId, ...values });
+    }
+  }
+}
+
 async function computeCompleteness(
   db: Database,
   model: {
@@ -57,32 +183,12 @@ async function computeCompleteness(
     id: string;
   },
 ): Promise<{ dataCompleteness: number; missing: string[] }> {
-  const [currentPrice] = await db
-    .select({ id: pricePoints.id })
-    .from(pricePoints)
-    .where(and(eq(pricePoints.modelId, model.id), eq(pricePoints.isCurrent, true)))
-    .limit(1);
-  const [primaryImage] = await db
-    .select({ id: modelImages.id })
-    .from(modelImages)
-    .where(and(eq(modelImages.modelId, model.id), eq(modelImages.isPrimary, true)))
-    .limit(1);
-  const [source] = await db.select({ id: sources.id }).from(sources).where(eq(sources.modelId, model.id)).limit(1);
-
-  const record = {
-    brandId: model.brandId,
-    familyId: model.familyId,
-    modelCode: model.modelCode,
-    displayName: model.displayName,
-    hasCurrentPrice: Boolean(currentPrice),
-    hasPrimaryImage: Boolean(primaryImage),
-    hasSource: Boolean(source),
-  };
-
-  return {
-    dataCompleteness: computeDataCompleteness(record),
-    missing: computeMissingFields('instrument_model', record),
-  };
+  const related = await getRelated(db, model.id);
+  return completenessFrom(model, {
+    hasCurrentPrice: Boolean(related.currentPrice),
+    hasPrimaryImage: Boolean(related.primaryImage),
+    hasSource: Boolean(related.source),
+  });
 }
 
 export async function createInstrumentModel(
@@ -115,8 +221,16 @@ export async function createInstrumentModel(
     version: 1,
   };
 
+  const completeness = completenessFrom(row, {
+    hasCurrentPrice: Boolean(input.price),
+    hasPrimaryImage: Boolean(input.primaryImage),
+    hasSource: Boolean(input.source),
+  });
+  row.dataCompleteness = completeness.dataCompleteness;
+
   const model = await db.transaction(async (tx) => {
     await tx.insert(instrumentModels).values(row);
+    await upsertRelated(tx, id, { currentPrice: undefined, primaryImage: undefined, source: undefined }, input);
     await writeAuditEntry(tx, actorUserId, 'instrument_model', id, 'create', null, row);
     return row;
   });
@@ -145,15 +259,22 @@ export async function editInstrumentModel(
     return { ok: false, reason: 'conflict', currentVersion: current.version };
   }
 
-  const after = { ...current, ...patch, version: current.version + 1 };
-  const completeness = await computeCompleteness(db, after);
+  const related = await getRelated(db, modelId);
+  const { price, primaryImage, source, ...modelPatch } = patch;
+  const after = { ...current, ...modelPatch, version: current.version + 1 };
+  const completeness = completenessFrom(after, {
+    hasCurrentPrice: Boolean(related.currentPrice || price),
+    hasPrimaryImage: Boolean(related.primaryImage || primaryImage),
+    hasSource: Boolean(related.source || source),
+  });
   after.dataCompleteness = completeness.dataCompleteness;
 
   const model = await db.transaction(async (tx) => {
     await tx
       .update(instrumentModels)
-      .set({ ...patch, version: after.version, dataCompleteness: after.dataCompleteness })
+      .set({ ...modelPatch, version: after.version, dataCompleteness: after.dataCompleteness })
       .where(eq(instrumentModels.id, modelId));
+    await upsertRelated(tx, modelId, related, { price, primaryImage, source });
     await writeAuditEntry(tx, actorUserId, 'instrument_model', modelId, 'edit', current, after);
     return after;
   });

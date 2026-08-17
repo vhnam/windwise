@@ -88,6 +88,17 @@ describe('editInstrumentModel', () => {
     expect(updated).toHaveLength(1);
     expect(inserted).toHaveLength(1);
   });
+
+  it('writes price, primary image, and source rows when they are provided', async () => {
+    const { db, inserted } = createFakeWriteDb([[{ role: 'editor' }], [MODEL_ROW], [], [], []]);
+    const result = await editInstrumentModel(db, 'user-1', 'org-1', 'model-1', 1, {
+      price: { scope: 'vn_street', amountMin: 1_000_000, amountMax: 1_200_000 },
+      primaryImage: { url: 'https://example.com/img.jpg', altEn: 'Clarinet', credit: 'Editor' },
+      source: { kind: 'manufacturer', url: 'https://example.com/source', publisher: 'Yamaha' },
+    });
+    expect(result.ok).toBe(true);
+    expect(inserted).toHaveLength(4);
+  });
 });
 
 describe('transitionInstrumentModel', () => {
