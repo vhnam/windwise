@@ -3,6 +3,7 @@ import type { Database } from '#/client.ts';
 type QueryChain = Promise<unknown[]> & {
   from: () => QueryChain;
   innerJoin: () => QueryChain;
+  leftJoin: () => QueryChain;
   where: () => QueryChain;
   limit: () => QueryChain;
   orderBy: () => QueryChain;
@@ -12,6 +13,7 @@ function chainable(rows: unknown[]): QueryChain {
   const query = Promise.resolve(rows) as QueryChain;
   query.from = () => query;
   query.innerJoin = () => query;
+  query.leftJoin = () => query;
   query.where = () => query;
   query.limit = () => query;
   query.orderBy = () => query;
@@ -43,7 +45,10 @@ export function createFakeWriteDb(selectQueue: unknown[][]): {
     return {
       values(values: unknown) {
         inserted.push({ table: 'unknown', values });
-        return Promise.resolve();
+        const query = Promise.resolve();
+        return Object.assign(query, {
+          onConflictDoUpdate: () => query,
+        });
       },
     };
   }

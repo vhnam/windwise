@@ -22,6 +22,8 @@ export {
 } from './queries/catalog-write.ts';
 export { getVerificationQueue } from './queries/verification-queue.ts';
 export { getAuditTrail } from './queries/audit-trail.ts';
+export { getCatalogSettings, updateCatalogSettings } from './queries/catalog-settings.ts';
+export { listOrganizationMembers, updateOrganizationMemberRole } from './queries/organization-members.ts';
 export { checkSourceLiveness } from './jobs/check-source-liveness.ts';
 export {
   seedDatabase,
