@@ -19,10 +19,13 @@ required fields, or carry a broken source link in a verification queue; and
 record every create, edit, status transition, and archive action as a
 same-transaction audit entry with a before/after diff, so the catalog is
 trustworthy as the single foundation that specs 005/006/007/009 all read from or
-build on top of. Scaffold `@windwise/db` (does not yet exist) and
-`@windwise/schemas` from scratch as part of this work, since no prior spec has
-created them — this feature is both the database's first writer and its first
-owner.
+build on top of. **Verified finding**: `@windwise/db` and `@windwise/schemas`
+already exist — built out by 005/007 with the six catalog tables (`brands`,
+`instrument_families`, `instrument_models`, `price_points`, `model_images`,
+`sources`) and the full `draft | in_review | published | archived` lifecycle
+enum already typed on `instrument_models.status`. This feature is not
+scaffolding those packages; it is their **first writer** — 005/006/007 only ever
+read from them.
 
 ## Entities
 
@@ -52,14 +55,30 @@ class Role {
     viewer
 }
 
+class Brand {
+    +string id
+    +string slug
+    +string name
+}
+
+class InstrumentFamily {
+    +string id
+    +string slug
+    +string section
+}
+
 class InstrumentModel {
     +string id
     +string brandId
     +string familyId
+    +string modelCode
+    +string displayName
+    +string levelTier
     +LifecycleStatus status
     +int dataCompleteness
     +string verifiedByUserId
     +DateTime lastVerifiedAt
+    +string reviewNotes
     +int version
     +DateTime updatedAt
     +requiredFieldsMissing() string[]
@@ -73,42 +92,35 @@ class LifecycleStatus {
     archived
 }
 
-class ModelSpec {
-    +string id
+class PricePoint {
     +string modelId
-    +string key
-    +string value
+    +string scope
+    +numeric amountMin
+    +numeric amountMax
+    +boolean isCurrent
 }
 
 class ModelImage {
     +string id
     +string modelId
     +string url
-    +string creditText
+    +string credit
     +string licenseNote
+    +boolean isPrimary
     +hasRequiredCredit() boolean
 }
 
 class Source {
     +string id
+    +string modelId
+    +string kind
     +string url
+    +string publisher
+    +DateTime retrievedAt
+    +boolean isPrimary
+    +string[] backedFields
     +boolean sourceOk
     +DateTime lastCheckedAt
-}
-
-class ModelSource {
-    +string id
-    +string modelId
-    +string sourceId
-    +string[] backedFields
-}
-
-class ReviewerNote {
-    +string id
-    +string modelId
-    +string authorUserId
-    +string body
-    +DateTime createdAt
 }
 
 class Comment {
@@ -165,13 +177,13 @@ class CanTransition {
 Organization "1" --> "1..*" OrganizationMember : has members
 OrganizationMember "1" --> "1" Role : assigned
 Organization "1" --> "1" CatalogSettings : configures
+InstrumentModel "N" -- "1" Brand : made by
+InstrumentModel "N" -- "1" InstrumentFamily : belongs to
 InstrumentModel "1" --> "1" LifecycleStatus : has
-InstrumentModel "1" --> "0..*" ModelSpec : has
-InstrumentModel "1" --> "0..*" ModelImage : has
-InstrumentModel "1" --> "0..*" ModelSource : has
-InstrumentModel "1" --> "0..*" ReviewerNote : accumulates
+InstrumentModel "1" --> "0..*" PricePoint : priced by
+InstrumentModel "1" --> "0..*" ModelImage : illustrated by
+InstrumentModel "1" --> "0..*" Source : verified by
 InstrumentModel "1" --> "0..*" Comment : accumulates
-ModelSource "0..*" --> "1" Source : references
 InstrumentModel "1" --> "0..*" AuditLog : audited by
 CanTransition --> OrganizationMember : reads current role
 CanTransition --> InstrumentModel : validates status change
@@ -181,17 +193,26 @@ VerificationQueueItem "1" --> "1..*" QueueReason : flags
 
 Conservative-constraint notes:
 
-- `InstrumentModel`, `ModelSpec`, `ModelImage`, `Source`, `ModelSource` are the
-  source-of-truth catalog tables that specs 005/006/007 read from and 009 will
-  attach rules to — do not add fields those specs would need without confirming
-  against their data-model docs; this spec only adds the write-path fields
-  (`status`, `dataCompleteness`, `verifiedByUserId`, `version`) that 005/006/007
-  do not currently exercise.
-- `ReviewerNote` and `Comment` are modeled as separate entities (SPEC GAP
-  resolved conservatively): the spec's US1.3 "reviewer's notes attached" and
-  US3.1 "Viewer... can add comments" name two different actions by two different
-  roles at two different lifecycle moments — do not collapse them into one table
-  without a spec update.
+- `Brand`, `InstrumentFamily`, `InstrumentModel`, `PricePoint`, `ModelImage`,
+  `Source` are the exact six tables already defined in
+  `packages/db/src/schema/catalog.ts` by 007 — there is no `ModelSpec` or
+  `ModelSource` table in this codebase; specs are plain columns on
+  `InstrumentModel` (`modelCode`, `displayName`, `levelTier`, already present)
+  and a `Source` row already carries `modelId` directly, so FR-007's "which
+  fields that source backs" is a new `backedFields` column added **to
+  `Source`**, not a new join table. Do not add fields those reading specs
+  (005/006/007) would need without confirming against their data-model docs;
+  this spec only adds write-path fields (`status` write, `dataCompleteness`,
+  `verifiedByUserId`, `reviewNotes`, `version`/`updatedAt` on `InstrumentModel`;
+  `backedFields`, `sourceOk`, `lastCheckedAt` on `Source`).
+- `reviewNotes` is modeled as a single nullable text column on
+  `InstrumentModel`, not a separate table (simplification vs. the prior draft of
+  this prompt): US1.3's "reviewer's notes attached" is a single note transported
+  with one `in_review → draft` transition, not an accumulating thread — it is
+  captured in the audit entry's `after` diff like any other field change and
+  overwritten on the next `in_review → draft` transition. `Comment`
+  (Viewer-authored, US3.1) stays a separate accumulating table because it is
+  explicitly plural ("add comments") and not gated by a lifecycle transition.
 - `VerificationQueueItem` and `QueueReason` are in-memory query output
   (`@windwise/schemas`), never persisted tables, per data-model.md.
 - `CanTransition` is a function, not a table — represented here to make the
@@ -200,9 +221,10 @@ Conservative-constraint notes:
 ## Approach
 
 1. **Roles via better-auth organization plugin, not a custom table**: Add the
-   `organization` plugin to `apps/manager-dashboard/src/lib/auth.ts`, extend its
-   `member.role` field to the five-value enum
-   (`owner | admin | editor | reviewer | viewer`) via the plugin's
+   `organization` plugin to `apps/manager-dashboard/src/lib/auth.ts` (currently
+   configured with only `emailAndPassword` + `tanstackStartCookies()` and no
+   database adapter at all), extend its `member.role` field to the five-value
+   enum (`owner | admin | editor | reviewer | viewer`) via the plugin's
    `additionalFields` mechanism. Do not build a parallel `organization_members`
    table — the plugin already models org → member → role and 008's spec role set
    maps directly onto it.
@@ -240,18 +262,19 @@ Conservative-constraint notes:
 
 6. **Publish gate uses one canonical required-field list, shared by three
    consumers**: Define the required-field list per entity type once (e.g.
-   `@windwise/db/authz/required-fields.ts`), and have the publish gate (FR-009),
-   the verification queue's missing-field check (FR-004), and the editor form's
-   inline validation all read from it. Never let two of these three drift into
-   separately-maintained lists — that was flagged as a design risk in the
-   strategic analysis.
+   `packages/db/src/authz/required-fields.ts`), and have the publish gate
+   (FR-009), the verification queue's missing-field check (FR-004), and the
+   editor form's inline validation all read from it. Never let two of these
+   three drift into separately-maintained lists — that was flagged as a design
+   risk in the strategic analysis.
 
 7. **No new shared package for lifecycle/role/audit logic**: This logic has
-   exactly one consumer, `apps/manager-dashboard`. It lives in `@windwise/db`
-   (adjacent to the tables it governs), not a new `packages/catalog-authz` or
-   similar. Do not create a new workspace member for this feature beyond
-   `@windwise/db` and `@windwise/schemas`, both of which are named as
-   intended-but-not-yet-built in AGENTS.md §14.
+   exactly one consumer, `apps/manager-dashboard`. It lives in the existing
+   `@windwise/db` package (adjacent to the catalog tables it governs, in a new
+   `src/authz/` subdirectory), not a new `packages/catalog-authz` or similar —
+   `@windwise/db` and `@windwise/schemas` already exist and are consumed by
+   005/006/007 today; this feature extends them rather than creating any new
+   workspace member.
 
 8. **Owner vs. Admin resolved conservatively as functionally equivalent for this
    feature**: The spec (FR-008, US3.4) never differentiates their powers;
@@ -273,12 +296,13 @@ Conservative-constraint notes:
 
 - `OrganizationMember.role` is the single source of truth `can-transition.ts`
   reads; nothing else stores a duplicate/cached role.
-- `InstrumentModel.status` is the single lifecycle field; `ModelSpec`,
-  `ModelImage`, `ModelSource` are children scoped by `modelId` and do not carry
-  their own independent status.
+- `InstrumentModel.status` is the single lifecycle field; `PricePoint`,
+  `ModelImage`, `Source` are children scoped by `modelId` and do not carry their
+  own independent status.
 - `VerificationQueueItem` and `AuditTrailEntry` are `@windwise/schemas`
   Valibot-validated shapes, never Drizzle table types — they are query output,
-  not persisted rows.
+  not persisted rows, matching the existing pattern of `ListingResult`/
+  `DetailResult` in `packages/schemas/src/catalog-browsing.ts`.
 - `AuditLog.before`/`after` are `jsonb` diffs keyed by changed field name only
   (not full-row snapshots), consistent with FR-010's "before/after diff of
   changed fields."
@@ -286,22 +310,25 @@ Conservative-constraint notes:
 ### Dependencies
 
 1. This spec is upstream of 005 (guided consultation) and 007 (catalog browsing)
-   — both read `status = 'published'` records from the tables this spec makes
-   writable for the first time. Do not change the read-side query shape those
-   specs already depend on without confirming against their plans.
+   — both already read `status = 'published'` records from the tables this spec
+   makes writable for the first time. Do not change the read-side query shape
+   those specs already depend on (`listPublishedInstruments`,
+   `getInstrumentDetail`, `listCatalogFacets`, `getModelById` in
+   `packages/db/src/queries/`) without confirming against their plans.
 2. This spec is upstream of 006 (instrument compare) for the same reason —
    compare surfaces only published records.
 3. This spec is upstream of 009 (recommendation rules authoring) — rules attach
    to catalog entities this spec is the source of truth for; 009 must not
    duplicate lifecycle/role/audit logic, it consumes the same `@windwise/db`
    tables and `can-transition.ts`.
-4. `apps/manager-dashboard` depends on `@windwise/db` (new), `@windwise/schemas`
-   (new), `@windwise/ui` (existing, dashboard theme), `@windwise/query`
+4. `apps/manager-dashboard` depends on `@windwise/db` (existing, extended with a
+   write path), `@windwise/schemas` (existing, extended with new in-memory
+   shapes), `@windwise/ui` (existing, dashboard theme), `@windwise/query`
    (existing, TanStack Query helpers), `better-auth` (existing dependency,
-   organization plugin newly configured).
+   organization plugin newly configured, database adapter newly wired).
 5. `@windwise/db` depends on `better-auth`'s organization/member tables for
-   `OrganizationMember` (extended, not duplicated) and owns `AuditLog`, catalog
-   tables, and `CatalogSettings` outright.
+   `OrganizationMember` (extended, not duplicated) and owns `AuditLog`, the
+   extended catalog tables, and `CatalogSettings` outright.
 6. `apps/consumer-application` has no new dependency from this spec — it
    continues to read the same catalog tables it already reads via 005/007's
    established read path; this spec must not require consumer-application code
@@ -316,63 +343,47 @@ Conservative-constraint notes:
    `can-transition.ts`, `catalog-write.ts`, `verification-queue.ts`,
    `audit-trail.ts`, `required-fields.ts`. This is where role checks, lifecycle
    rules, and audit writes are centralized. Exposed to the route layer as
-   TanStack Start server functions.
-3. **DB/audit layer** (`packages/db/src/schema/`): Drizzle schema definitions —
-   catalog tables, `organization-members.ts` (better-auth plugin extension),
-   `audit-logs.ts`, `catalog-settings.ts`. This layer has no business logic,
-   only table shape and constraints (foreign keys, `NOT NULL`, enum types).
+   TanStack Start server functions. Existing read-only query functions
+   (`list-published-instruments.ts`, `get-instrument-detail.ts`,
+   `list-catalog-facets.ts`, `get-model-by-id.ts`) are untouched by this layer —
+   this spec adds write-side siblings, it does not modify them.
+3. **DB/audit layer** (`packages/db/src/schema/`): Drizzle schema definitions.
+   `catalog.ts` is **extended** (new columns on `instrument_models` and
+   `sources`, no new catalog tables); `organization-members.ts` (better-auth
+   plugin extension), `audit-logs.ts`, `catalog-settings.ts`, and `comments.ts`
+   are new files. This layer has no business logic, only table shape and
+   constraints (foreign keys, `NOT NULL`, enum types).
 4. **Validation layer**: `vp -C packages/db test`,
    `vp -C apps/manager-dashboard test`, then workspace-wide `vp run ready`.
 
 ## Operations
 
-### Create Package - `packages/db/package.json`
+### Extend Schema - `packages/db/src/schema/catalog.ts`
 
-1. Responsibility: Scaffold the `@windwise/db` workspace member — does not exist
-   yet in this repo (confirmed by strategic analysis and direct inspection of
-   `packages/`).
-2. Content: `"name": "@windwise/db"`, `"version": "0.1.0"`, `"private": true`,
-   `drizzle-orm`, `postgres` (or the platform's chosen pg driver), `drizzle-kit`
-   as devDependency, catalog-referenced versions where the workspace catalog
-   already pins one (e.g. `@types/node`).
-3. Constraints: Follows `packages/query`/`packages/vite-config` as the
-   sibling-package template for `package.json` shape, `tsconfig.json`, and
-   `exports` map conventions. No `main`/`module` dual build unless an existing
-   sibling package already does one — match `packages/query`'s pattern.
-
-### Create Package - `packages/schemas/package.json`
-
-1. Responsibility: Scaffold `@windwise/schemas` — the Valibot-validated
-   in-memory shapes (`VerificationQueueItem`, `AuditTrailEntry`) that
-   data-model.md defines as living here, not in `@windwise/db`.
-2. Content: `"name": "@windwise/schemas"`, `"version": "0.1.0"`,
-   `"private": true`, `valibot` (catalog-pinned).
-3. Constraints: Pure schema/type package — no Drizzle, no server-function code,
-   no React. Both `apps/manager-dashboard` and (eventually) 009 import from
-   here.
-
-### Create Schema - `packages/db/src/schema/catalog.ts`
-
-1. Responsibility: Drizzle table definitions for `brands`,
-   `instrument_families`, `instrument_models`, `model_specs`, `model_images`,
-   `sources`, `model_sources` per plan.md §Storage and platform §3.2, including
-   this spec's new write-path fields.
-2. Fields on `instrument_models` beyond the base catalog shape: `status` (pgEnum
-   `draft | in_review | published | archived`, default `'draft'`),
-   `data_completeness` (integer 0-100), `verified_by_user_id` (uuid, fk to
-   better-auth `user.id`), `last_verified_at` (timestamp), `version` (integer,
-   default 1, incremented on every write) or `updated_at` used as the
-   optimistic-concurrency token — pick one and use it consistently across
-   `catalog-write.ts`.
-3. Fields on `model_images`: `credit_text` (text, not null), `license_note`
-   (text, not null) — publish gate blocks any image missing either (FR-006).
-4. Fields on `sources`: `source_ok` (boolean, nullable — null means "not yet
-   checked"), `last_checked_at` (timestamp).
-5. New table `model_sources` gains `backed_fields` (text array) per FR-007
-   ("which fields that source backs").
-6. Constraints: All FKs `on delete restrict` for catalog rows referenced by
-   `audit_logs`/`model_sources` (never cascade-delete a record with audit
-   history). Enum types use `pgEnum`, not plain text with an app-level check.
+1. Responsibility: Add the write-path columns this spec needs to the existing
+   `instrument_models` and `sources` table definitions — **no new catalog
+   tables** (`brands`, `instrument_families`, `price_points`, `model_images`
+   already exist unchanged from 007).
+2. New columns on `instrumentModels`:
+   - `dataCompleteness`: integer 0-100, not null, default 0
+   - `verifiedByUserId`: uuid, nullable, fk to better-auth's `user.id`
+   - `reviewNotes`: text, nullable — set on `in_review → draft`
+     (request-changes), cleared on the next `draft → in_review` transition
+   - `version`: integer, not null, default 1, incremented by `catalog-write.ts`
+     on every successful write (optimistic-concurrency token; use `version`, not
+     `updatedAt`, for the explicit integer-comparison semantics
+     `editInstrumentModel`'s contract needs)
+3. New columns on `sources`:
+   - `backedFields`: text array, not null, default `'{}'` — satisfies FR-007
+     ("which fields that source backs")
+   - `sourceOk`: boolean, nullable (`null` = not yet checked)
+   - `lastCheckedAt`: timestamp with timezone, nullable
+4. Constraints: `instrument_models.status` already exists as the
+   `draft | in_review | published | archived` `pgEnum` from 007 — do not
+   redefine or alter it, only start writing to it. All new columns are additive
+   (`ALTER TABLE ... ADD COLUMN`), generated via the existing Drizzle migration
+   workflow (`db:generate`) alongside 0002's precedent for backfilling any NOT
+   NULL column against existing rows.
 
 ### Create Schema - `packages/db/src/schema/organization-members.ts`
 
@@ -407,6 +418,19 @@ Conservative-constraint notes:
 2. Constraints: One row per `organization_id`; do not add per-entity-type
    thresholds — spec does not ask for that granularity.
 
+### Create Schema - `packages/db/src/schema/comments.ts`
+
+1. Responsibility: `Comment` table for Viewer (and any role) annotations on a
+   catalog record (FR-008/US3.1), decoupled from `reviewNotes`.
+2. Fields: `id` (uuid pk), `modelId` (uuid, fk to `instrument_models.id`),
+   `authorUserId` (uuid, fk), `body` (text, not null), `createdAt` (timestamp,
+   default now).
+3. Constraints: Read/write does not go through `can-transition.ts` — adding a
+   comment is not a lifecycle transition and does not require an audit entry
+   under FR-010 (which scopes audit to "create, edit, status transition,
+   archive" of the record itself, not comment threads); any role that can view a
+   record can add a comment per FR-008.
+
 ### Create Function - `packages/db/src/authz/can-transition.ts`
 
 1. Responsibility: Single shared lifecycle/role check (research.md §2); every
@@ -434,12 +458,16 @@ Conservative-constraint notes:
    (Approach §6).
 2. Signature: `getRequiredFields(entityType: 'instrument_model'): string[]` and
    `computeMissingFields(entityType, record): string[]`.
-3. Constraints: SPEC GAP — the exact field list is not enumerated in
-   spec.md/data-model.md. Populate it from the fields data-model.md already
-   marks as required by the review gate (`status`-blocking fields: brand,
-   family, at least one spec value, at least one image with credit+license, at
-   least one source) and flag any field beyond that as
-   `SPEC GAP / OPEN QUESTION` in a code comment rather than guessing.
+3. Logic: For `instrument_model`, a record is publish-ready only if all of the
+   following hold — `brandId`, `familyId`, `modelCode`, and `displayName` are
+   non-empty (already `NOT NULL` at the schema level, checked here for
+   completeness reporting); at least one current `PricePoint` exists for the
+   model; at least one `ModelImage` exists with `isPrimary = true` (its
+   `credit`/`licenseNote` are already schema-enforced `NOT NULL`, so a
+   publishable image is never missing them by construction); at least one
+   `Source` row exists for the model. This list is deliberately the minimum the
+   spec's FRs name (FR-004, FR-006, FR-009) — treat any additional field as a
+   **SPEC GAP / OPEN QUESTION** to raise, not silently add.
 
 ### Create Function - `packages/db/src/queries/catalog-write.ts`
 
@@ -449,19 +477,22 @@ Conservative-constraint notes:
    routing through the shared write function, the guarantee silently breaks").
 2. Signatures and logic:
    - `createInstrumentModel(actorUserId, orgId, input): Promise<InstrumentModel>`
-     — inserts with `status: 'draft'`, `version: 1`; within the same
-     transaction, calls
+     — inserts with `status: 'draft'`, `version: 1`, `dataCompleteness` computed
+     via `required-fields.ts`; within the same transaction, calls
      `writeAuditEntry(actor, 'instrument_model', newId, 'create', null, after)`.
    - `editInstrumentModel(actorUserId, orgId, modelId, expectedVersion, patch): Promise<InstrumentModel>`
      — reads current role via `getCurrentRole(actorUserId, orgId)`; rejects if
      `expectedVersion !== stored version` with a conflict error (optimistic
-     concurrency, research.md §5); computes the diff of changed fields; writes
-     the row and an `edit` audit entry in one transaction.
+     concurrency, research.md §5); recomputes `dataCompleteness`; computes the
+     diff of changed fields; writes the row (incrementing `version`) and an
+     `edit` audit entry in one transaction. `patch` may never include `status` —
+     status only changes through `transitionInstrumentModel`.
    - `transitionInstrumentModel(actorUserId, orgId, modelId, expectedVersion, targetStatus, note?): Promise<InstrumentModel>`
      — reads current role and current status fresh; calls `canTransition`; if
      target is `published`, calls `computeMissingFields` and rejects with the
      missing-field list if non-empty (FR-009); on `in_review → draft` with a
-     `note`, also inserts a `ReviewerNote` row in the same transaction; writes a
+     `note`, sets `reviewNotes = note` on the same row in the same transaction;
+     on `draft → in_review`, clears `reviewNotes` to `null`; writes a
      `status_transition` audit entry.
    - `archiveInstrumentModel(actorUserId, orgId, modelId, expectedVersion): Promise<InstrumentModel>`
      — same pattern, `action: 'archive'`.
@@ -495,8 +526,9 @@ Conservative-constraint notes:
    - For each: compute `stale` reason if `last_verified_at` older than the
      threshold; compute `missing_fields` reason via
      `computeMissingFields('instrument_model', record)`; compute `broken_source`
-     reason by joining `model_sources → sources` and checking
-     `source_ok = false`.
+     reason by checking whether any `Source` row for the model has
+     `source_ok = false` (batched `inArray` lookup, matching the N+1-avoidance
+     convention `list-published-instruments.ts` already establishes).
    - A record may carry more than one reason simultaneously (data-model.md,
      confirmed intentional in strategic analysis) — group by record, not by
      reason.
@@ -543,9 +575,11 @@ Conservative-constraint notes:
 2. Logic: Add `organization({ ... })` to the `plugins` array alongside the
    existing `tanstackStartCookies()`; configure `additionalFields.role` on the
    member schema to reference the Drizzle `roleEnum`; wire the `database`
-   adapter to the new `@windwise/db` Drizzle instance (currently `auth.ts` has
-   no database adapter configured at all — this is a new addition, not an
-   extension).
+   adapter to `@windwise/db`'s existing Drizzle instance (`getDb()` from
+   `packages/db/src/client.ts`) — `auth.ts` currently has **no database adapter
+   configured at all**, so this is the first time `apps/manager-dashboard`'s
+   auth layer connects to Postgres, not an extension of an existing DB-backed
+   config.
 3. Constraints: Do not remove `emailAndPassword` or `tanstackStartCookies()` —
    those are out of scope (spec Assumptions: "account creation/authentication
    mechanics themselves are out of scope").
@@ -559,7 +593,10 @@ Conservative-constraint notes:
    buttons (Edit only if actor role is editor+; the create button only if
    editor+).
 3. Constraints: Read path only — no direct DB access from the route component;
-   reads status via the server function, not client-side.
+   reads status via the server function, not client-side. Replaces the current
+   placeholder `apps/manager-dashboard/src/routes/index.tsx` welcome content as
+   the app's real landing surface (existing index route content is out of scope
+   to preserve — it is scaffold boilerplate, not product content).
 
 ### Create Route - `apps/manager-dashboard/src/routes/catalog/$modelId/edit.tsx`
 
@@ -582,7 +619,8 @@ Conservative-constraint notes:
 2. Logic: Server function query for `status = 'in_review'`; approve button calls
    `transitionInstrumentModel(..., 'published')` (blocked with a missing-field
    message if FR-009 rejects it); request-changes control requires a note field
-   and calls `transitionInstrumentModel(..., 'draft', note)`.
+   and calls `transitionInstrumentModel(..., 'draft', note)`, which lands in
+   `InstrumentModel.reviewNotes`.
 3. Constraints: Only rendered/actionable for reviewer+ role — editor/viewer
    sessions see a role-appropriate empty/denied state, not a broken page.
 
@@ -632,9 +670,9 @@ Conservative-constraint notes:
    correct before/after; concurrent edit with a stale `expectedVersion` is
    rejected with a conflict error, not silently applied; revoked-role save
    attempt (actor's role changed between session start and save) is denied.
-3. Framework: `vite-plus/test` against a test database instance following
-   whatever DB-test setup convention `packages/query` or existing app tests use
-   (inspect before inventing a new one).
+3. Framework: `vite-plus/test`, following the same DB-test setup convention
+   `packages/db`'s existing tests (e.g. `list-published-instruments`'s query
+   coverage) already use — inspect before inventing a new one.
 
 ### Create Tests - `packages/db/src/queries/verification-queue.test.ts`
 
@@ -647,10 +685,11 @@ Conservative-constraint notes:
 ### Create Changeset - `.changeset/catalog-management-workflow.md`
 
 1. Responsibility: Record shipped package/app changes per AGENTS.md §7.
-2. Content: `minor` for `@windwise/db` (new package, new public API surface),
-   `minor` for `@windwise/schemas` (new package), `minor` for
-   `@windwise/manager-dashboard` (new catalog/verification-queue/audit/ settings
-   routes and role-gated behavior).
+2. Content: `minor` for `@windwise/db` (new write-path public API surface:
+   `catalog-write.ts`, `verification-queue.ts`, `audit-trail.ts`, `authz/`),
+   `minor` for `@windwise/schemas` (new `VerificationQueueItem`/
+   `AuditTrailEntry` shapes), `minor` for `@windwise/manager-dashboard` (new
+   catalog/verification-queue/audit/settings routes and role-gated behavior).
 3. Constraints: No `Co-authored-by` trailer (AGENTS.md §7). Follow the `0.y.z`
    baseline — do not jump to `1.0.0` for this feature alone.
 
@@ -674,14 +713,14 @@ Conservative-constraint notes:
    `apps/consumer-application` must not gain a new dependency from this work.
 2. **Imports**: Use `@windwise/db`, `@windwise/schemas`, `@windwise/ui`,
    `@windwise/query` via `workspace:*`, matching existing app import grouping.
-   Within `packages/db`, follow whatever `#/` alias convention
-   `packages/ui`/`packages/query` already establish for internal imports (verify
-   against those packages' `package.json` `imports` field before adding a new
-   one).
+   Within `packages/db`, follow the `#/*` → `./src/*` alias convention already
+   declared in `packages/db/package.json`'s `imports` field (matching
+   `get-model-by-id.ts`'s existing `#/client.ts` / `#/schema/index.ts` import
+   style) for internal imports — do not introduce a new alias scheme.
 3. **Tests**: `vite-plus/test` exclusively —
    `import { describe, expect, it } from 'vite-plus/test'`. Colocate tests next
    to source (`can-transition.test.ts` beside `can-transition.ts`), matching
-   `packages/ui/src/styles/globals.test.ts`'s colocation pattern.
+   `packages/schemas/src/pricing.test.ts`'s colocation pattern.
 4. **Changesets**: One changeset per PR covering all packages/apps touched
    (AGENTS.md §7); `minor` for new public exports on `@windwise/db`/
    `@windwise/schemas`; skip changesets only for docs/spec-only edits.
@@ -698,7 +737,8 @@ Conservative-constraint notes:
 7. **No domain leakage into `@windwise/ui`**: Catalog/audit/verification-queue
    UI is dashboard-app-specific; only generic primitives (table, badge, dialog)
    come from `@windwise/ui` — do not add `InstrumentCard` or `AuditDiffView`
-   components to the shared UI package (AGENTS.md §9).
+   components to the shared UI package (AGENTS.md §9), mirroring 007's identical
+   rule for `apps/consumer-application`'s catalog-page composites.
 
 ## Safeguards
 
@@ -712,7 +752,10 @@ Conservative-constraint notes:
    broken-source detection is strictly the periodic job's flag.
    Status-transition and edit round-trips must reflect in the UI via TanStack
    Query invalidation without a full page reload (plan.md's stated performance
-   target).
+   target). Any per-model lookup across a set of matched models (broken-source
+   checks, missing-field checks) must be batched (`inArray`), matching the
+   N+1-avoidance rule 007's `list-published-instruments.ts` already establishes
+   for this codebase.
 3. **Security**: Every catalog mutation re-reads the actor's role from the
    database at call time — no role read from a client-supplied or session-cached
    claim is ever trusted for an authorization decision (FR-012). Audit log rows
@@ -720,30 +763,33 @@ Conservative-constraint notes:
    for `audit_logs`; tamper-resistance is enforced by never writing an update
    path, not by database-level permissions this spec doesn't scope in.
 4. **Integration**: This is the foundation 005/006/007/009 depend on — do not
-   change the shape of already-established read queries those specs use without
-   checking their plan/data-model docs first. `apps/consumer-application` must
-   not gain any new dependency or route from this work.
+   change the shape of already-established read queries those specs use
+   (`list-published-instruments.ts`, `get-instrument-detail.ts`,
+   `list-catalog-facets.ts`, `get-model-by-id.ts`) without checking their
+   plan/data-model docs first. `apps/consumer-application` must not gain any new
+   dependency or route from this work.
 5. **Business rules**: Nothing reaches `status = 'published'` through any path
    other than the reviewer-gated `transitionInstrumentModel` function (FR-001).
    Publish is always blocked when required fields are missing (FR-009) — this
    check cannot be bypassed by directly calling `editInstrumentModel` with
-   `status: 'published'` in the patch; status changes only happen through the
+   `status: 'published'` in the patch; `editInstrumentModel` must reject any
+   patch that includes `status` at all — status changes only happen through the
    transition function. Archival is never automatically reversed (spec Edge
    Cases) — restore is always an explicit Admin+ action. The staleness threshold
    is a per-organization, Owner/Admin-configurable setting (SPEC GAP resolved)
    and changing it must be reflected on the next verification-queue read, not
    retroactively backfilled onto records.
-6. **Technical constraints**: `@windwise/db` and `@windwise/schemas` are new
-   packages created by this work item — do not skip scaffolding them by inlining
-   Drizzle schema directly into `apps/manager-dashboard`. Optimistic concurrency
-   (`version`/`updated_at`) is mandatory on every catalog write function; a
-   write without a version check on a mutable record is a safeguard violation.
-7. **Data constraints**: `model_images` cannot be published without both
-   `credit_text` and `license_note` populated (FR-006) — enforced at the
-   publish-gate level via `required-fields.ts`, not only as a DB `NOT NULL`
-   (images can exist in draft without credit info; only publish blocks it).
-   `AuditLog.before`/`after` store field-level diffs, not full-row snapshots, to
-   keep entries reviewable.
+6. **Technical constraints**: `@windwise/db` and `@windwise/schemas` already
+   exist — do not re-scaffold them or duplicate their `package.json`/`tsconfig`
+   setup; this work item only adds new files inside them. Optimistic concurrency
+   (`version`) is mandatory on every catalog write function; a write without a
+   version check on a mutable record is a safeguard violation.
+7. **Data constraints**: `model_images.credit`/`license_note` are already
+   `NOT NULL` at the schema level (007) — this spec does not weaken that
+   constraint; the publish gate additionally requires at least one
+   `isPrimary = true` image to exist at all (`required-fields.ts`), which is an
+   application-level check the schema cannot express. `AuditLog.before`/ `after`
+   store field-level diffs, not full-row snapshots, to keep entries reviewable.
 8. **API constraints**: Every catalog-mutating server function accepts and
    validates `expectedVersion`; every function reads role fresh, never accepts a
    role parameter from the client. `getVerificationQueue` and `getAuditTrail`

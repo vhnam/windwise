@@ -236,9 +236,10 @@ files, read completely and treated as approved planning context (not restated
 here so the analysis stays usable; they remain the source of truth on disk):
 
 - `plan.md` — extends `apps/manager-dashboard` (currently an auth-scaffold
-  shell) and `@windwise/db` (currently read-only for 005/007) with full CRUD;
-  centralizes lifecycle/role checks in one `can-transition.ts`; no new shared
-  package
+  shell) and `@windwise/db` (currently read-only for 005/007, tables:
+  `brands`/`instrument_families`/`instrument_models`/`price_points`/
+  `model_images`/`sources`) with full CRUD; centralizes lifecycle/role checks in
+  one `can-transition.ts`; no new shared package
 - `research.md` — five decisions: better-auth organization plugin for roles;
   single shared `can-transition.ts`; same-transaction audit writes; verification
   queue as a read query (live staleness/missing-field checks,
@@ -275,14 +276,23 @@ No existing SPDD analysis or prompt under this `work_item` was present.
   role concept exists in the current configuration — the plugin referenced in
   plan.md/research.md §1 is not yet added.
 - **Catalog domain tables (`brands`, `instrument_families`, `instrument_models`,
-  `model_specs`, `model_images`, `sources`, `model_sources`)**: Named in
-  plan.md/data-model.md as platform §3.2 tables that features 005 and 007
-  already read from `@windwise/db`. No `packages/db` workspace member exists yet
-  in this repo snapshot — the workspace currently has `packages/query`,
-  `packages/ui`, `packages/vite-config` only. This feature is described as the
-  first to need write access to these tables, but the schema package itself has
-  not been scaffolded, so "existing" here means "existing as a documented
-  contract from prior features' plans," not as code present today.
+  `price_points`, `model_images`, `sources`)**: `packages/db` now exists (built
+  out by 005/007) with these six tables defined in
+  `packages/db/src/schema/catalog.ts` — there is no separate `model_specs` or
+  `model_sources` table; specs are columns on `instrument_models`, and
+  `sources`/`price_points`/`model_images` carry `modelId` directly. Read-only
+  query functions already live in `packages/db/src/queries/`
+  (`list-published-instruments.ts`, `get-instrument-detail.ts`,
+  `list-catalog-facets.ts`, `get-model-by-id.ts`, `consultation.ts`, and others)
+  and are re-exported from `packages/db/src/index.ts`. **Verified finding**:
+  `instrument_models.status` is already typed as the full
+  `draft | in_review | published | archived` enum (`modelStatusEnum` in
+  `catalog.ts`) — the lifecycle _values_ this feature governs already exist as a
+  column type; what's missing is the write path, transition enforcement, and
+  role gating around it, plus new columns this feature needs
+  (`data_completeness`, `verified_by_user_id`, a version/`updated_at`
+  concurrency column, and a `source_ok` flag on `sources`). This feature is the
+  first to write to any of these tables — 005 and 007 only read them.
 - **`@windwise/ui`**: The shared, domain-free component library (see
   004-ui-core-foundation) both apps consume; plan.md calls for reusing its
   "denser dashboard theme, same primitives" for catalog/review/queue/audit
@@ -295,11 +305,13 @@ No existing SPDD analysis or prompt under this `work_item` was present.
 
 #### New Concepts Required
 
-- **Catalog record lifecycle (Draft → In Review → Published → Archived)**: A
-  state machine gating consumer visibility of `instrument_models`. New as an
-  enforced, code-level invariant — the tables it governs exist only as a
-  read-only contract for 005/007 today; this feature introduces the `status`
-  column semantics and the only legal paths between its values.
+- **Catalog record lifecycle enforcement (Draft → In Review → Published →
+  Archived)**: A state machine gating consumer visibility of
+  `instrument_models`. The `status` column and its four-value enum already exist
+  in `packages/db/src/schema/catalog.ts` (written by 007's migration); what's
+  new is the enforced, code-level invariant — the only legal transition paths,
+  the role gate on each, and the fact that nothing today writes to this column
+  at all (005/007's queries only filter on `status = 'published'`).
 - **Role Assignment (Owner/Admin/Editor/Reviewer/Viewer)**: A per-user,
   per-organization role governing which lifecycle transitions and record
   mutations a user may perform. New — no organization/member/role concept exists
@@ -507,14 +519,18 @@ records that have crossed the "published" boundary.
 
 #### Technical Risks
 
-- **`packages/db` does not exist yet in this repo**: plan.md and data-model.md
-  describe catalog tables (`brands`, `instrument_models`, etc.) as if 005/007
-  already established them, but no `packages/db` workspace member is present in
-  the current monorepo (only `query`, `ui`, `vite-config` exist under
-  `packages/`). This feature's actual starting point may be earlier in the stack
-  than plan.md assumes — schema scaffolding itself, not just extension, could be
-  in scope. This should be confirmed before design proceeds, since it changes
-  the size of the work.
+- **`packages/db` and the catalog schema are now confirmed in place**: as of
+  this review, `packages/db/src/schema/catalog.ts` defines `brands`,
+  `instrument_families`, `instrument_models` (with the full lifecycle enum
+  already on `status`), `price_points`, `model_images`, and `sources`, plus read
+  query functions 005/007 already built. This resolves the prior open question
+  about whether schema scaffolding was in scope — it is not; this feature's
+  starting point is genuinely "extend an existing, populated schema with a write
+  path," as plan.md assumes. The concrete gap is narrower than a from-scratch
+  schema: new columns (`data_completeness`, `verified_by_user_id`, a concurrency
+  version column, `source_ok` on `sources`) plus the
+  `organization_members`/`audit_logs` tables and all write-path/role/audit
+  logic.
 - **`better-auth` organization plugin is entirely unconfigured today**:
   `apps/manager-dashboard/src/lib/auth.ts` has no organization, member, or role
   setup — the five-role model, invitation flow, and role-check primitives all
@@ -568,6 +584,8 @@ entity shapes.
 
 Open questions / risks to carry into REASONS Canvas: canonical required-field
 list per entity type; reviewer-notes and comment data shapes; Owner-vs-Admin
-permission boundary; whether `packages/db` needs to be scaffolded from scratch
-as part of this feature or is a true prerequisite; broken-source auto-clear
-behavior; guarantee (or lack thereof) of at least one Reviewer per organization.
+permission boundary; broken-source auto-clear behavior; guarantee (or lack
+thereof) of at least one Reviewer per organization. (The prior open question of
+whether `packages/db` needed scaffolding from scratch is resolved — it exists,
+with the full catalog schema and lifecycle enum already in place; see Technical
+Risks.)
