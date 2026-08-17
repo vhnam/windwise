@@ -19,7 +19,7 @@ export const Route = createRootRouteWithContext<QueryRouterContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'WindWise | Dashboard',
+        title: 'WindWise | Manager Dashboard',
       },
     ],
     links: [
