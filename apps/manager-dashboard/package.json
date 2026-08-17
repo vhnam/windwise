@@ -14,12 +14,18 @@
     "test": "vp test"
   },
   "dependencies": {
+    "@formisch/react": "catalog:",
     "@t3-oss/env-core": "catalog:",
+    "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-start": "catalog:",
+    "@windwise/db": "workspace:*",
     "@windwise/query": "workspace:*",
+    "@windwise/schemas": "workspace:*",
     "@windwise/ui": "workspace:*",
-    "better-auth": "^1.5.3",
+    "better-auth": "^1.6.29",
+    "drizzle-orm": "catalog:",
+    "lucide-react": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "valibot": "catalog:"
