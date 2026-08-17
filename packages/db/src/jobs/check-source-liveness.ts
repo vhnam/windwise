@@ -5,16 +5,20 @@ import { sources } from '#/schema/index.ts';
 
 const CHECK_TIMEOUT_MS = 5000;
 
-async function isReachable(url: string): Promise<boolean> {
+async function request(url: string, method: 'HEAD' | 'GET'): Promise<boolean> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), CHECK_TIMEOUT_MS);
-    const response = await fetch(url, { method: 'HEAD', signal: controller.signal });
+    const response = await fetch(url, { method, signal: controller.signal });
     clearTimeout(timeout);
     return response.ok || (response.status >= 300 && response.status < 400);
   } catch {
     return false;
   }
+}
+
+async function isReachable(url: string): Promise<boolean> {
+  return (await request(url, 'HEAD')) || (await request(url, 'GET'));
 }
 
 export async function checkSourceLiveness(db: Database, sourceIds?: string[]): Promise<void> {
