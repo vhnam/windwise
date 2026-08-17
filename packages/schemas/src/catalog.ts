@@ -1,18 +1,23 @@
 import * as v from 'valibot';
 
-export const SectionSchema = v.picklist(['brass', 'woodwind']);
+export const SectionFilters = ['brass', 'woodwind'] as const;
+export const SectionSchema = v.picklist(SectionFilters);
 export type Section = v.InferOutput<typeof SectionSchema>;
 
-export const LevelTierSchema = v.picklist(['student', 'intermediate', 'professional', 'custom']);
+export const LevelTierFilters = ['student', 'intermediate', 'professional', 'custom'] as const;
+export const LevelTierSchema = v.picklist(LevelTierFilters);
 export type LevelTier = v.InferOutput<typeof LevelTierSchema>;
 
-export const ModelStatusSchema = v.picklist(['draft', 'in_review', 'published', 'archived']);
+export const STATUS_FILTERS = ['draft', 'in_review', 'published', 'archived'] as const;
+export const ModelStatusSchema = v.picklist(STATUS_FILTERS);
 export type ModelStatus = v.InferOutput<typeof ModelStatusSchema>;
 
-export const PriceScopeSchema = v.picklist(['msrp_global', 'vn_street']);
+export const PriceScopeFilters = ['msrp_global', 'vn_street'] as const;
+export const PriceScopeSchema = v.picklist(PriceScopeFilters);
 export type PriceScope = v.InferOutput<typeof PriceScopeSchema>;
 
-export const SourceKindSchema = v.picklist(['manufacturer', 'dealer', 'manual_pdf', 'editorial', 'expert_review']);
+export const SourceKindFilters = ['manufacturer', 'dealer', 'manual_pdf', 'editorial', 'expert_review'] as const;
+export const SourceKindSchema = v.picklist(SourceKindFilters);
 export type SourceKind = v.InferOutput<typeof SourceKindSchema>;
 
 export const BrandSchema = v.object({
