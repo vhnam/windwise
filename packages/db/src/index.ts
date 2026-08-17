@@ -10,12 +10,30 @@ export { listPublishedComparisonNotes } from './queries/list-published-compariso
 export { listPublishedInstruments } from './queries/list-published-instruments.ts';
 export { getInstrumentDetail } from './queries/get-instrument-detail.ts';
 export { listCatalogFacets } from './queries/list-catalog-facets.ts';
+export { canTransition } from './auth/can-transition.ts';
+export { computeDataCompleteness, computeMissingFields, getRequiredFields } from './auth/required-fields.ts';
+export { writeAuditEntry } from './auth/write-audit-entry.ts';
+export type { CreateInstrumentModelInput, EditInstrumentModelPatch } from './queries/catalog-write.ts';
+export {
+  archiveInstrumentModel,
+  createInstrumentModel,
+  editInstrumentModel,
+  transitionInstrumentModel,
+} from './queries/catalog-write.ts';
+export { getVerificationQueue } from './queries/verification-queue.ts';
+export { getAuditTrail } from './queries/audit-trail.ts';
+export { checkSourceLiveness } from './jobs/check-source-liveness.ts';
 export {
   seedDatabase,
   seedCatalogRows,
+  seedAdminAccount,
   SEED_QUESTION_SET_ID,
   SEED_RULE_SET_ID,
   SEED_FAMILY_IDS,
   SEED_MODEL_IDS,
   SEED_RULES,
+  SEED_ADMIN_USER_ID,
+  SEED_ADMIN_EMAIL,
+  SEED_ORGANIZATION_ID,
+  SEED_ORGANIZATION_SLUG,
 } from './seed.ts';
