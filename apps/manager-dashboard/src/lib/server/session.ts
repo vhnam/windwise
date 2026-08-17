@@ -1,9 +1,11 @@
 import { getRequest } from '@tanstack/react-start/server';
 import { eq } from 'drizzle-orm';
 
+import type { Role } from '@windwise/schemas';
+
 import { auth } from '#/lib/auth.ts';
 
-export type ActorContext = { userId: string; organizationId: string };
+export type ActorContext = { userId: string; organizationId: string; role: Role };
 
 export async function getActorContext(): Promise<ActorContext | null> {
   const request = getRequest();
@@ -16,7 +18,7 @@ export async function getActorContext(): Promise<ActorContext | null> {
   const db = getDb();
 
   const [member] = await db
-    .select({ organizationId: organizationMembers.organizationId })
+    .select({ organizationId: organizationMembers.organizationId, role: organizationMembers.role })
     .from(organizationMembers)
     .where(eq(organizationMembers.userId, session.user.id))
     .limit(1);
@@ -25,5 +27,5 @@ export async function getActorContext(): Promise<ActorContext | null> {
     return null;
   }
 
-  return { userId: session.user.id, organizationId: member.organizationId };
+  return { userId: session.user.id, organizationId: member.organizationId, role: member.role };
 }
