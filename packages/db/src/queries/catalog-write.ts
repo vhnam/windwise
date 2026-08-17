@@ -48,7 +48,7 @@ export type CreateInstrumentModelInput = {
 export type EditInstrumentModelPatch = Partial<
   Pick<CreateInstrumentModelInput, 'brandId' | 'familyId' | 'modelCode' | 'displayName' | 'levelTier'>
 > &
-  CatalogRelatedInput;
+  CatalogRelatedInput & { status?: never };
 
 function toInstrumentModel(row: typeof instrumentModels.$inferSelect): InstrumentModel {
   return {
