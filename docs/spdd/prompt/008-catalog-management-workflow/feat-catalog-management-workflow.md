@@ -205,6 +205,12 @@ Conservative-constraint notes:
   this spec only adds write-path fields (`status` write, `dataCompleteness`,
   `verifiedByUserId`, `reviewNotes`, `version`/`updatedAt` on `InstrumentModel`;
   `backedFields`, `sourceOk`, `lastCheckedAt` on `Source`).
+- `ModelImage.url` remains a single text column. The editor may persist either a
+  publicly reachable `http(s)` URL or a `data:` URL produced by
+  `CatalogImageAttachmentField` (file read in the browser, JPEG/PNG/WebP/GIF,
+  1.5 MB cap). There is no `MediaAsset` table or object-storage entity in this
+  work item — a CDN/media store is a documented SPEC GAP, not a silent new
+  table.
 - `reviewNotes` is modeled as a single nullable text column on
   `InstrumentModel`, not a separate table (simplification vs. the prior draft of
   this prompt): US1.3's "reviewer's notes attached" is a single note transported
@@ -290,6 +296,18 @@ Conservative-constraint notes:
    spec FR requires one) — do not build seat-count validation on role
    assignment; document it as a known operational gap in Safeguards instead.
 
+10. **Editor UI is Formisch + Content Manager layout, not Zustand**: Catalog
+    create/edit state lives in `@formisch/react` bound to `CatalogEditSchema`
+    (`apps/manager-dashboard/src/schemas/catalog-edit.schema.ts`). Do not
+    introduce Zustand for unsaved draft fields — plan.md's "Zustand for
+    client-only draft state" is superseded by the Formisch form already used on
+    login/forgot/reset. The edit screen follows a Content Manager pattern:
+    sticky entry header (back, title, status, Save / Mark ready / Publish),
+    field-group cards (Identity, Pricing, Primary image, Source), and a sticky
+    Information aside (id, version, last verified, completeness, history link,
+    Archive). Primary image uses `@windwise/ui` `Attachment` primitives composed
+    in the dashboard module — not a new shared catalog widget.
+
 ## Structure
 
 ### Type Relationships
@@ -323,9 +341,11 @@ Conservative-constraint notes:
    tables and `can-transition.ts`.
 4. `apps/manager-dashboard` depends on `@windwise/db` (existing, extended with a
    write path), `@windwise/schemas` (existing, extended with new in-memory
-   shapes), `@windwise/ui` (existing, dashboard theme), `@windwise/query`
-   (existing, TanStack Query helpers), `better-auth` (existing dependency,
-   organization plugin newly configured, database adapter newly wired).
+   shapes), `@windwise/ui` (existing, dashboard theme plus generic primitives
+   such as `Attachment`, `Field`, `Card`, `Dialog` — no catalog-named
+   composites), `@windwise/query` (existing, TanStack Query helpers),
+   `better-auth` (existing dependency, organization plugin newly configured,
+   database adapter newly wired).
 5. `@windwise/db` depends on `better-auth`'s organization/member tables for
    `OrganizationMember` (extended, not duplicated) and owns `AuditLog`, the
    extended catalog tables, and `CatalogSettings` outright.
@@ -336,9 +356,12 @@ Conservative-constraint notes:
 
 ### Layered Architecture
 
-1. **Route/dashboard layer** (`apps/manager-dashboard/src/routes/`): TanStack
-   Start route modules and React components. Calls server functions only; never
-   imports Drizzle or touches `@windwise/db` internals directly.
+1. **Route/dashboard layer** (`apps/manager-dashboard/src/routes/` plus
+   `apps/manager-dashboard/src/modules/`): TanStack Start route modules stay
+   thin (loader + `component`). Product UI for catalog lives in
+   `src/modules/catalog/` (`catalog-list`, `catalog-edit`) and calls server
+   functions / query options only; never imports Drizzle or touches
+   `@windwise/db` internals directly.
 2. **Service layer** (`packages/db/src/authz/`, `packages/db/src/queries/`):
    `can-transition.ts`, `catalog-write.ts`, `verification-queue.ts`,
    `audit-trail.ts`, `required-fields.ts`. This is where role checks, lifecycle
@@ -598,18 +621,67 @@ Conservative-constraint notes:
    the app's real landing surface (existing index route content is out of scope
    to preserve — it is scaffold boilerplate, not product content).
 
-### Create Route - `apps/manager-dashboard/src/routes/catalog/$modelId/edit.tsx`
+### Create Route - `apps/manager-dashboard/src/routes/_protected/catalog/$modelId/edit.tsx`
 
-1. Responsibility: Editor form for draft/in-review records (US1).
-2. Logic: Loads the record with its current `version`; on save, calls the
-   `editInstrumentModel` server function passing the loaded `version` as
-   `expectedVersion`; on conflict-error response, surfaces a conflict message
-   (not a silent overwrite) per the concurrent-edit edge case; "mark ready"
-   button calls `transitionInstrumentModel(..., 'in_review')`.
-3. Constraints: Zustand used only for unsaved-draft form state per plan.md's
-   Technical Context ("not used for anything with a server counterpart") — do
-   not use Zustand for the record data itself, that stays in TanStack Query
-   cache.
+1. Responsibility: Thin TanStack Start route for create (`modelId === 'new'`)
+   and edit. Loads the record (or `null` for new) and renders `CatalogEdit`.
+2. Logic: `loader` calls `getInstrumentRecordFn` unless `modelId === 'new'`;
+   `component` is `CatalogEdit` from `#/modules/catalog/catalog-edit`.
+3. Constraints: No form markup in the route file — layout, Formisch form, and
+   workflow actions live in the catalog-edit module.
+
+### Create Module - `apps/manager-dashboard/src/modules/catalog/catalog-edit/catalog-edit.tsx`
+
+1. Responsibility: Content Manager-style editor for a catalog entry (US1).
+2. Layout:
+   - Sticky header: back link to `/catalog`, collection label ("Create an entry"
+     / "Edit an entry"), title (`Untitled` for new, else `displayName`), status
+     with text + color dot, **Save**, **Mark ready** (`draft → in_review`),
+     **Publish** (`in_review → published`).
+   - Main column: focusable error summary (`There is a problem`, links to
+     `#field-id`); field-group cards for Identity, Pricing, Primary image,
+     Source.
+   - Aside: Information (status, entry id, version, last verified, completeness,
+     review notes, link to `/audit/$entityId`); Archive for `published` records
+     behind a confirm dialog.
+3. Logic: `@formisch/react` `useForm` + `CatalogEditSchema`; submit calls
+   `useCatalogEditActions().submitSave`; workflow buttons call
+   `handleTransition`. After failed submit, move focus to the error summary (do
+   not replace inline `FieldError`s).
+4. Constraints: Zustand is not used. Do not put catalog-specific composites in
+   `@windwise/ui`.
+
+### Create Module - `apps/manager-dashboard/src/modules/catalog/catalog-edit/catalog-edit.actions.tsx`
+
+1. Responsibility: Server-function wiring for create, edit, and status
+   transition from the editor.
+2. Logic: `submitSave` maps form values through `toRelatedInput` (optional
+   `price`, `primaryImage`, `source`) then `createInstrumentRecordFn` /
+   `editInstrumentRecordFn` with `expectedVersion`; conflict surfaces
+   `Someone else edited this record. Reload to see the latest version.`;
+   `handleTransition` calls `transitionStatusFn` and on
+   `MISSING_REQUIRED_FIELDS` sets `missingFields` plus
+   `Cannot publish until required fields are saved.`
+3. Constraints: Record data stays in the route loader / TanStack Query — this
+   hook does not cache the instrument row in Zustand.
+
+### Create Module - `apps/manager-dashboard/src/modules/catalog/catalog-edit/catalog-edit-fields.tsx`
+
+1. Responsibility: Field metadata (`CATALOG_EDIT_FIELDS`), select/text controls,
+   and the primary-image attachment control.
+2. `CatalogImageAttachmentField`:
+   - Composes `@windwise/ui` `Attachment` (`idle` / `uploading` / `error` /
+     `done`) with a visually hidden `input type="file"` and optional paste-URL
+     `Input` (hidden while `imageUrl` is a `data:` URL).
+   - Accepts `image/jpeg,image/png,image/webp,image/gif`; max 1.5 MB;
+     `FileReader.readAsDataURL` writes into Formisch `imageUrl`.
+   - Errors: `Choose a JPEG, PNG, WebP, or GIF image.`;
+     `Image must be 1.5 MB or smaller.`; `Could not read that image.`
+   - Remove action (`aria-label="Remove image"`) clears `imageUrl`.
+   - Click/drop to replace; icon-only remove has an accessible name.
+3. Constraints: Do not add an `InstrumentImageUploader` (or similar) to
+   `packages/ui`. Do not invent object storage in this module — persistence
+   remains `ModelImage.url` via `catalog-write.ts`.
 
 ### Create Route - `apps/manager-dashboard/src/routes/catalog/review/index.tsx`
 
@@ -735,10 +807,17 @@ Conservative-constraint notes:
 6. **Formatting/linting**: oxfmt/oxlint via `vp check`; no additional lint
    config invented for this work item.
 7. **No domain leakage into `@windwise/ui`**: Catalog/audit/verification-queue
-   UI is dashboard-app-specific; only generic primitives (table, badge, dialog)
-   come from `@windwise/ui` — do not add `InstrumentCard` or `AuditDiffView`
-   components to the shared UI package (AGENTS.md §9), mirroring 007's identical
-   rule for `apps/consumer-application`'s catalog-page composites.
+   UI is dashboard-app-specific; only generic primitives (table, badge, dialog,
+   field, attachment) come from `@windwise/ui` — do not add `InstrumentCard`,
+   `AuditDiffView`, or `InstrumentImageUploader` to the shared UI package
+   (AGENTS.md §9), mirroring 007's identical rule for
+   `apps/consumer-application`'s catalog-page composites. The catalog editor
+   composes `Attachment` in
+   `apps/manager-dashboard/src/modules/catalog/catalog-edit/catalog-edit-fields.tsx`.
+8. **Editor forms**: Catalog create/edit uses `@formisch/react` with a Valibot
+   schema colocated at
+   `apps/manager-dashboard/src/schemas/catalog-edit.schema.ts`, matching
+   login/forgot-password/reset-password — not Zustand.
 
 ## Safeguards
 
@@ -747,7 +826,11 @@ Conservative-constraint notes:
    collaborative/CRDT editing. Do not build pessimistic row locking. Do not
    build a background job framework beyond the one periodic source-liveness
    check this spec requires. Do not build seat-count/at-least-one-Reviewer
-   enforcement (documented gap, not this spec's scope).
+   enforcement (documented gap, not this spec's scope). Do not build object
+   storage, a media library, or CDN upload for catalog images in this work item
+   — `CatalogImageAttachmentField` encodes a chosen file as a `data:` URL in
+   `ModelImage.url` (or accepts a pasted `http(s)` URL). A public media store
+   remains a SPEC GAP.
 2. **Performance**: Verification-queue reads must not perform live HTTP calls;
    broken-source detection is strictly the periodic job's flag.
    Status-transition and edit round-trips must reflect in the UI via TanStack
@@ -790,6 +873,9 @@ Conservative-constraint notes:
    `isPrimary = true` image to exist at all (`required-fields.ts`), which is an
    application-level check the schema cannot express. `AuditLog.before`/ `after`
    store field-level diffs, not full-row snapshots, to keep entries reviewable.
+   Client-side image pickers may write a `data:` URL into `ModelImage.url`; they
+   must reject non-image types and files larger than 1.5 MB before calling
+   `editInstrumentModel` / `createInstrumentModel`.
 8. **API constraints**: Every catalog-mutating server function accepts and
    validates `expectedVersion`; every function reads role fresh, never accepts a
    role parameter from the client. `getVerificationQueue` and `getAuditTrail`
