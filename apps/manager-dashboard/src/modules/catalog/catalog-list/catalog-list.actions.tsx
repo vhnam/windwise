@@ -4,6 +4,8 @@ import { useTable } from '@tanstack/react-table';
 
 import type { ModelStatus } from '@windwise/schemas';
 
+import { hasMinRole } from '#/lib/roles';
+import { getActorContextFn } from '#/lib/server/actor';
 import { listCatalogRecordsQueryOptions } from '#/queries/catalog';
 import { CATALOG_PAGE_SIZE } from '#/services/catalog.service';
 
@@ -16,6 +18,11 @@ export const useCatalogListActions = () => {
   const search = catalogRoute.useSearch();
   const navigate = catalogRoute.useNavigate();
   const page = search.page ?? 1;
+  const actorQuery = useQuery({
+    queryKey: ['actor-context'],
+    queryFn: () => getActorContextFn(),
+  });
+  const canEdit = hasMinRole(actorQuery.data?.role, 'editor');
 
   const query = useQuery(
     listCatalogRecordsQueryOptions({
@@ -33,7 +40,7 @@ export const useCatalogListActions = () => {
   const table = useTable({
     features: catalogListTableFeatures,
     data: records,
-    columns: catalogListColumns,
+    columns: catalogListColumns(canEdit),
     getRowId: (row) => row.id,
     manualPagination: true,
     rowCount: totalCount,
@@ -74,5 +81,6 @@ export const useCatalogListActions = () => {
     isError: query.isError,
     error: query.error,
     totalCount,
+    canEdit,
   };
 };
