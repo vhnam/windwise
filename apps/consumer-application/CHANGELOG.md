@@ -1,5 +1,16 @@
 # @windwise/consumer-application
 
+## 0.4.1
+
+### Patch Changes
+
+- Updated dependencies [a1ebfef]
+  - @windwise/db@0.5.0
+  - @windwise/schemas@0.5.0
+  - @windwise/ui@0.4.0
+  - @windwise/ai@0.3.2
+  - @windwise/core@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
