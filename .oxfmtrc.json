@@ -6,7 +6,7 @@
   "semi": true,
   "bracketSpacing": true,
   "arrowParens": "always",
-  "ignorePatterns": ["**/routeTree.gen.ts"],
+  "ignorePatterns": ["**/routeTree.gen.ts", "./.claude/**", "./.changeset/**"],
   "overrides": [
     {
       "files": ["**/*.{ts,tsx,js,jsx}"],
