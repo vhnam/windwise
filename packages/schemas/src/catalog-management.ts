@@ -49,6 +49,16 @@ export const AuditTrailEntrySchema = v.object({
 });
 export type AuditTrailEntry = v.InferOutput<typeof AuditTrailEntrySchema>;
 
+export const CommentListItemSchema = v.object({
+  id: v.string(),
+  modelId: v.string(),
+  authorUserId: v.string(),
+  authorDisplayName: v.string(),
+  body: v.string(),
+  createdAt: v.string(),
+});
+export type CommentListItem = v.InferOutput<typeof CommentListItemSchema>;
+
 export const LifecycleStatusSchema = ModelStatusSchema;
 export type LifecycleStatus = v.InferOutput<typeof LifecycleStatusSchema>;
 
@@ -57,6 +67,7 @@ export type TransitionResult = { allowed: true } | { allowed: false; reason: 'ro
 export type WriteError =
   | { ok: false; reason: 'conflict'; currentVersion: number }
   | { ok: false; reason: 'role-denied' }
-  | { ok: false; reason: 'missing-fields'; fields: string[] };
+  | { ok: false; reason: 'missing-fields'; fields: string[] }
+  | { ok: false; reason: 'invalid-input' };
 
 export type WriteResult<T> = { ok: true; value: T } | WriteError;
