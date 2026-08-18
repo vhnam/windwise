@@ -8,18 +8,23 @@ const componentsDir = fileURLToPath(new URL('../components/', import.meta.url));
 const packageJsonPath = fileURLToPath(new URL('../../package.json', import.meta.url));
 
 const ALL_MODULES = [
+  'alert.tsx',
+  'attachment.tsx',
   'avatar.tsx',
   'badge.tsx',
   'breadcrumb.tsx',
+  'button-group.tsx',
   'button.tsx',
   'card.tsx',
   'chart.tsx',
   'dialog.tsx',
   'dropdown-menu.tsx',
+  'empty.tsx',
   'field.tsx',
   'input-group.tsx',
   'input.tsx',
   'label.tsx',
+  'pagination.tsx',
   'popover.tsx',
   'questionnaire.tsx',
   'select.tsx',

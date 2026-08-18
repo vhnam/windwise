@@ -4,8 +4,14 @@ Member-facing [TanStack Start](https://tanstack.com/start) app
 (`@windwise/consumer-application`). Dev server: **http://localhost:3000**.
 
 Shared Query, styles, and Vite plugins come from workspace packages.
-App-specific code lives here: PowerSync, TanStack AI, env, and member-facing UI.
-Do not put Windwise domain components in `@windwise/ui`.
+App-specific code lives here: PowerSync, consultation UI, env, and member-facing
+UI. Do not put Windwise domain components in `@windwise/ui`.
+
+Catalog facts and recommendation scores come from
+[`@windwise/db`](../../packages/db/README.md) and
+[`@windwise/core`](../../packages/core/README.md). The LLM adapter in
+[`@windwise/ai`](../../packages/ai/README.md) must not invent model names,
+prices, or scores. Only **published** instruments appear on consumer surfaces.
 
 Workflow and naming: [AGENTS.md](../../AGENTS.md).
 
@@ -27,6 +33,10 @@ vp run dev:consumer
 Or from this directory: `vp dev`. Production build: `vp build`. Tests:
 `vp test`.
 
+Published catalog rows come from the same Postgres as the manager dashboard.
+Migrate and seed via [`@windwise/db`](../../packages/db/README.md) if listings
+are empty.
+
 ## Environment
 
 Defined in `src/env.ts` ([T3 Env](https://env.t3.gg/) + Valibot). Import with
@@ -40,6 +50,9 @@ Defined in `src/env.ts` ([T3 Env](https://env.t3.gg/) + Valibot). Import with
 | `VITE_POWERSYNC_TOKEN` | client | Dev token only; replace with real auth before production |
 | `VITE_APP_TITLE`       | client | Optional document title override                         |
 | `SERVER_URL`           | server | Optional absolute server URL                             |
+
+`getDb()` reads `DATABASE_URL` from the process environment (not this app’s T3
+`env` object). Set it in `.env.local` when a server route loads the catalog.
 
 Create API keys (paste into `.env.local`; do not commit them):
 
@@ -57,7 +70,8 @@ Create API keys (paste into `.env.local`; do not commit them):
   [`@windwise/vite-config`](../../packages/vite-config/README.md)
 - Base CSS from [`@windwise/ui`](../../packages/ui/README.md)
 - PowerSync (`src/lib/powersync`, `src/integrations/powersync`)
-- TanStack AI (`@tanstack/ai-openai`, `@tanstack/ai-gemini`)
+- Consultation tools via [`@windwise/ai`](../../packages/ai/README.md)
+- Deterministic ranking via [`@windwise/core`](../../packages/core/README.md)
 
 The Vite config also registers `powersync-vite-plugin.ts` so PowerSync workers
 resolve from the monorepo root.

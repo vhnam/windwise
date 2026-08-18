@@ -1,25 +1,41 @@
+import { hashPassword } from 'better-auth/crypto';
+import { eq } from 'drizzle-orm';
+
 import type { ConditionAst, RuleEffect } from '@windwise/schemas';
 
 import type { Database } from '#/client.ts';
 import {
+  account,
   brands,
+  catalogSettings,
   instrumentFamilies,
   instrumentModels,
+  member,
   modelAliases,
   modelComparisonNotes,
   modelImages,
+  organization,
   pricePoints,
   questionSets,
   questions,
   ruleSets,
   rules,
   sources,
+  user,
 } from '#/schema/index.ts';
 import { normalizeModelPair } from '#/schema/model-comparison-notes.ts';
 
 export const SEED_QUESTION_SET_ID = '11111111-1111-4111-8111-111111111111';
 export const SEED_RULE_SET_ID = '22222222-2222-4222-8222-222222222222';
 export const SEED_BRAND_ID = '33333333-3333-4333-8333-333333333333';
+
+export const SEED_ADMIN_USER_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddd01';
+export const SEED_ADMIN_ACCOUNT_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddd02';
+export const SEED_ORGANIZATION_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddd03';
+export const SEED_ADMIN_MEMBER_ID = 'dddddddd-dddd-4ddd-8ddd-dddddddddd04';
+export const SEED_ADMIN_EMAIL = 'admin@windwise.io';
+export const SEED_ADMIN_PASSWORD = 'P@ssw0rd!!';
+export const SEED_ORGANIZATION_SLUG = 'windwise';
 
 export const SEED_FAMILY_IDS = {
   trumpet: '44444444-4444-4444-8444-444444444401',
@@ -428,4 +444,55 @@ export async function seedDatabase(db: Database): Promise<void> {
       publishedAt: VERIFIED_AT,
     })
     .onConflictDoNothing();
+
+  await seedAdminAccount(db);
+}
+
+export async function seedAdminAccount(db: Database): Promise<void> {
+  const [existing] = await db.select({ id: user.id }).from(user).where(eq(user.email, SEED_ADMIN_EMAIL)).limit(1);
+  if (existing) {
+    return;
+  }
+
+  const passwordHash = await hashPassword(SEED_ADMIN_PASSWORD);
+  const now = new Date();
+
+  await db.insert(user).values({
+    id: SEED_ADMIN_USER_ID,
+    name: 'Admin',
+    email: SEED_ADMIN_EMAIL,
+    emailVerified: true,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await db.insert(account).values({
+    id: SEED_ADMIN_ACCOUNT_ID,
+    accountId: SEED_ADMIN_USER_ID,
+    providerId: 'credential',
+    userId: SEED_ADMIN_USER_ID,
+    password: passwordHash,
+    createdAt: now,
+    updatedAt: now,
+  });
+
+  await db
+    .insert(organization)
+    .values({
+      id: SEED_ORGANIZATION_ID,
+      name: 'WindWise',
+      slug: SEED_ORGANIZATION_SLUG,
+      createdAt: now,
+    })
+    .onConflictDoNothing();
+
+  await db.insert(member).values({
+    id: SEED_ADMIN_MEMBER_ID,
+    organizationId: SEED_ORGANIZATION_ID,
+    userId: SEED_ADMIN_USER_ID,
+    role: 'owner',
+    createdAt: now,
+  });
+
+  await db.insert(catalogSettings).values({ organizationId: SEED_ORGANIZATION_ID }).onConflictDoNothing();
 }

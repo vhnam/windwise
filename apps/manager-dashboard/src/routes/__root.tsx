@@ -19,7 +19,7 @@ export const Route = createRootRouteWithContext<QueryRouterContext>()({
         content: 'width=device-width, initial-scale=1',
       },
       {
-        title: 'WindWise | Dashboard',
+        title: 'WindWise | Manager Dashboard',
       },
     ],
     links: [
@@ -30,7 +30,12 @@ export const Route = createRootRouteWithContext<QueryRouterContext>()({
     ],
   }),
   shellComponent: RootDocument,
+  notFoundComponent: NotFound,
 });
+
+function NotFound() {
+  return <div>Not Found</div>;
+}
 
 function RootDocument({ children }: PropsWithChildren) {
   return (
@@ -40,8 +45,10 @@ function RootDocument({ children }: PropsWithChildren) {
       </head>
       <body>
         <ThemeProvider>
-          <TooltipProvider>{children}</TooltipProvider>
-          <Toaster />
+          <TooltipProvider>
+            {children}
+            <Toaster />
+          </TooltipProvider>
         </ThemeProvider>
         <Scripts />
       </body>

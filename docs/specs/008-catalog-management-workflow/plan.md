@@ -40,10 +40,22 @@ feature adds role/organization data on top of it), Valibot, Drizzle ORM,
 Zustand/Query boundary — not used for anything with a server counterpart)
 
 **Storage**: PostgreSQL via `@windwise/db` — this feature is the first to
-require full CRUD (not just reads) on `brands`, `instrument_families`,
-`instrument_models`, `model_specs`, `model_images`, `sources`, `model_sources`
-(platform §3.2), plus new `organization_members`/role and `audit_logs` tables
-(platform §3.1's `identity` domain group)
+require full CRUD (not just reads) on the tables 007 actually delivered:
+`brands`, `instrument_families`, `instrument_models`, `price_points`,
+`model_images`, `sources` (`packages/db/src/schema/catalog.ts`; there is no
+separate `model_specs` or `model_sources` table — specs are columns on
+`instrument_models`, and `sources`/`price_points`/`model_images` already carry
+`modelId` directly, not through join tables), plus new
+`organization_members`/role and `audit_logs` tables (platform §3.1's `identity`
+domain group). **Verified finding**: 007 already defined `model_status` as
+`draft | in_review | published | archived` in
+`packages/db/src/schema/catalog.ts` — the full lifecycle enum this feature
+governs already exists; 008 does not create or alter that enum, only the
+transition/audit logic around it. 008 does need new columns 007 didn't add:
+`data_completeness`, `verified_by_user_id` on `instrument_models`, a
+`version`/`updated_at` column for optimistic concurrency (research.md §5), and a
+`source_ok` flag on `sources` (research.md §4) — these are additive migrations
+on 007's existing tables, not new tables.
 
 **Testing**: `vp run -r test`; unit tests on the lifecycle state machine (every
 legal/illegal transition per role); integration tests on the publish gate
@@ -143,6 +155,12 @@ packages/
             ├── catalog-write.ts          # NEW — create/edit/transition, all routed through can-transition + audit write
             ├── verification-queue.ts     # NEW — staleness/missing-field/broken-source query
             └── audit-trail.ts            # NEW — read a record's chronological history
+        # REUSED, not duplicated, from 007 (packages/db/src/queries/,
+        # packages/schemas/src/): list-published-instruments.ts,
+        # get-instrument-detail.ts, list-catalog-facets.ts, pricing.ts
+        # (resolveDisplayPrice), catalog-browsing.ts DTOs. catalog-write.ts
+        # writes the same `instrument_models`/`model_images`/`sources` rows
+        # 007's queries read — no second price-resolution or DTO layer.
 
 apps/
 └── manager-dashboard/              # EXISTING app (currently auth-scaffold only)

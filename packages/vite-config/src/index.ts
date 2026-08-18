@@ -2,13 +2,16 @@ import babel from '@rolldown/plugin-babel';
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import viteReact, { reactCompilerPreset } from '@vitejs/plugin-react';
-import { createRunnableDevEnvironment, lazyPlugins, type Plugin } from 'vite-plus';
+import { createRunnableDevEnvironment } from 'vite';
+import { lazyPlugins, type Plugin, type PluginOption } from 'vite-plus';
 
 /**
- * Vite+ and `vite` (aliased to vite-plus-core) can resolve as two module
- * instances, so TanStack Start's `isRunnableDevEnvironment()` instanceof check
- * fails and its SSR HTML middleware is never installed → "Cannot GET /".
- * @see https://github.com/TanStack/router/issues/7218
+ * Vite+ can resolve `vite` as a second copy of vite-plus-core, so Start's
+ * `instanceof RunnableDevEnvironment` check is unreliable. Creating the SSR
+ * env from `vite` still helps; the Connect HTML middleware is installed by a
+ * pnpm patch on `@tanstack/start-plugin-core` (duck-type `runner` instead of
+ * instanceof / dispatchFetch).
+ * @see https://github.com/TanStack/router/issues/7614
  */
 export function forceRunnableSsrEnvironment(): Plugin {
   return {
@@ -29,12 +32,17 @@ export function forceRunnableSsrEnvironment(): Plugin {
 }
 
 export function tanstackAppPlugins(...extraPlugins: Plugin[]) {
-  return lazyPlugins(() => [
-    forceRunnableSsrEnvironment(),
-    ...extraPlugins,
-    tailwindcss(),
-    tanstackStart(),
-    viteReact(),
-    babel({ presets: [reactCompilerPreset()] }),
-  ]);
+  // Mixed plugin packages each ship their own `Plugin` type. Unifying them
+  // into Vite+'s recursive `PluginOption` hits TS2321 (excessive stack depth).
+  return lazyPlugins(
+    () =>
+      [
+        forceRunnableSsrEnvironment(),
+        ...extraPlugins,
+        tailwindcss(),
+        tanstackStart(),
+        viteReact(),
+        babel({ presets: [reactCompilerPreset()] }),
+      ] as PluginOption[],
+  );
 }

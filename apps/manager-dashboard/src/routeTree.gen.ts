@@ -10,42 +10,178 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ProtectedRouteImport } from './routes/_protected'
+import { Route as PublicRouteImport } from './routes/_public'
+import { Route as ProtectedVerificationQueueRouteImport } from './routes/_protected/verification-queue'
+import { Route as ProtectedAuditEntityIdRouteImport } from './routes/_protected/audit/$entityId'
+import { Route as ProtectedCatalogIndexRouteImport } from './routes/_protected/catalog/index'
+import { Route as ProtectedSettingsMembersRouteImport } from './routes/_protected/settings/members'
+import { Route as PublicAuthForgotPasswordRouteImport } from './routes/_public/auth/forgot-password'
+import { Route as PublicAuthLoginRouteImport } from './routes/_public/auth/login'
+import { Route as PublicAuthResetPasswordRouteImport } from './routes/_public/auth/reset-password'
 import { Route as ApiAuthSplatRouteImport } from './routes/api/auth/$'
+import { Route as ProtectedCatalogModelIdEditRouteImport } from './routes/_protected/catalog/$modelId/edit'
+import { Route as ProtectedCatalogReviewIndexRouteImport } from './routes/_protected/catalog/review/index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProtectedRoute = ProtectedRouteImport.update({
+  id: '/_protected',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PublicRoute = PublicRouteImport.update({
+  id: '/_public',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProtectedVerificationQueueRoute =
+  ProtectedVerificationQueueRouteImport.update({
+    id: '/verification-queue',
+    path: '/verification-queue',
+    getParentRoute: () => ProtectedRoute,
+  } as any)
+const ProtectedAuditEntityIdRoute = ProtectedAuditEntityIdRouteImport.update({
+  id: '/audit/$entityId',
+  path: '/audit/$entityId',
+  getParentRoute: () => ProtectedRoute,
+} as any)
+const ProtectedCatalogIndexRoute = ProtectedCatalogIndexRouteImport.update({
+  id: '/catalog/',
+  path: '/catalog/',
+  getParentRoute: () => ProtectedRoute,
+} as any)
+const ProtectedSettingsMembersRoute =
+  ProtectedSettingsMembersRouteImport.update({
+    id: '/settings/members',
+    path: '/settings/members',
+    getParentRoute: () => ProtectedRoute,
+  } as any)
+const PublicAuthForgotPasswordRoute =
+  PublicAuthForgotPasswordRouteImport.update({
+    id: '/auth/forgot-password',
+    path: '/auth/forgot-password',
+    getParentRoute: () => PublicRoute,
+  } as any)
+const PublicAuthLoginRoute = PublicAuthLoginRouteImport.update({
+  id: '/auth/login',
+  path: '/auth/login',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicAuthResetPasswordRoute = PublicAuthResetPasswordRouteImport.update({
+  id: '/auth/reset-password',
+  path: '/auth/reset-password',
+  getParentRoute: () => PublicRoute,
+} as any)
 const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
   id: '/api/auth/$',
   path: '/api/auth/$',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProtectedCatalogModelIdEditRoute =
+  ProtectedCatalogModelIdEditRouteImport.update({
+    id: '/catalog/$modelId/edit',
+    path: '/catalog/$modelId/edit',
+    getParentRoute: () => ProtectedRoute,
+  } as any)
+const ProtectedCatalogReviewIndexRoute =
+  ProtectedCatalogReviewIndexRouteImport.update({
+    id: '/catalog/review/',
+    path: '/catalog/review/',
+    getParentRoute: () => ProtectedRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/verification-queue': typeof ProtectedVerificationQueueRoute
+  '/audit/$entityId': typeof ProtectedAuditEntityIdRoute
+  '/settings/members': typeof ProtectedSettingsMembersRoute
+  '/auth/forgot-password': typeof PublicAuthForgotPasswordRoute
+  '/auth/login': typeof PublicAuthLoginRoute
+  '/auth/reset-password': typeof PublicAuthResetPasswordRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/catalog/': typeof ProtectedCatalogIndexRoute
+  '/catalog/$modelId/edit': typeof ProtectedCatalogModelIdEditRoute
+  '/catalog/review/': typeof ProtectedCatalogReviewIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/verification-queue': typeof ProtectedVerificationQueueRoute
+  '/audit/$entityId': typeof ProtectedAuditEntityIdRoute
+  '/settings/members': typeof ProtectedSettingsMembersRoute
+  '/auth/forgot-password': typeof PublicAuthForgotPasswordRoute
+  '/auth/login': typeof PublicAuthLoginRoute
+  '/auth/reset-password': typeof PublicAuthResetPasswordRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/catalog': typeof ProtectedCatalogIndexRoute
+  '/catalog/$modelId/edit': typeof ProtectedCatalogModelIdEditRoute
+  '/catalog/review': typeof ProtectedCatalogReviewIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_protected': typeof ProtectedRouteWithChildren
+  '/_public': typeof PublicRouteWithChildren
+  '/_protected/verification-queue': typeof ProtectedVerificationQueueRoute
+  '/_protected/audit/$entityId': typeof ProtectedAuditEntityIdRoute
+  '/_protected/settings/members': typeof ProtectedSettingsMembersRoute
+  '/_public/auth/forgot-password': typeof PublicAuthForgotPasswordRoute
+  '/_public/auth/login': typeof PublicAuthLoginRoute
+  '/_public/auth/reset-password': typeof PublicAuthResetPasswordRoute
   '/api/auth/$': typeof ApiAuthSplatRoute
+  '/_protected/catalog/': typeof ProtectedCatalogIndexRoute
+  '/_protected/catalog/$modelId/edit': typeof ProtectedCatalogModelIdEditRoute
+  '/_protected/catalog/review/': typeof ProtectedCatalogReviewIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/api/auth/$'
+  fullPaths:
+    | '/'
+    | '/verification-queue'
+    | '/audit/$entityId'
+    | '/settings/members'
+    | '/auth/forgot-password'
+    | '/auth/login'
+    | '/auth/reset-password'
+    | '/api/auth/$'
+    | '/catalog/'
+    | '/catalog/$modelId/edit'
+    | '/catalog/review/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/api/auth/$'
-  id: '__root__' | '/' | '/api/auth/$'
+  to:
+    | '/'
+    | '/verification-queue'
+    | '/audit/$entityId'
+    | '/settings/members'
+    | '/auth/forgot-password'
+    | '/auth/login'
+    | '/auth/reset-password'
+    | '/api/auth/$'
+    | '/catalog'
+    | '/catalog/$modelId/edit'
+    | '/catalog/review'
+  id:
+    | '__root__'
+    | '/'
+    | '/_protected'
+    | '/_public'
+    | '/_protected/verification-queue'
+    | '/_protected/audit/$entityId'
+    | '/_protected/settings/members'
+    | '/_public/auth/forgot-password'
+    | '/_public/auth/login'
+    | '/_public/auth/reset-password'
+    | '/api/auth/$'
+    | '/_protected/catalog/'
+    | '/_protected/catalog/$modelId/edit'
+    | '/_protected/catalog/review/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ProtectedRoute: typeof ProtectedRouteWithChildren
+  PublicRoute: typeof PublicRouteWithChildren
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
 }
 
@@ -58,6 +194,69 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_protected': {
+      id: '/_protected'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof ProtectedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_public': {
+      id: '/_public'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof PublicRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_protected/verification-queue': {
+      id: '/_protected/verification-queue'
+      path: '/verification-queue'
+      fullPath: '/verification-queue'
+      preLoaderRoute: typeof ProtectedVerificationQueueRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_protected/audit/$entityId': {
+      id: '/_protected/audit/$entityId'
+      path: '/audit/$entityId'
+      fullPath: '/audit/$entityId'
+      preLoaderRoute: typeof ProtectedAuditEntityIdRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_protected/catalog/': {
+      id: '/_protected/catalog/'
+      path: '/catalog'
+      fullPath: '/catalog/'
+      preLoaderRoute: typeof ProtectedCatalogIndexRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_protected/settings/members': {
+      id: '/_protected/settings/members'
+      path: '/settings/members'
+      fullPath: '/settings/members'
+      preLoaderRoute: typeof ProtectedSettingsMembersRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_public/auth/forgot-password': {
+      id: '/_public/auth/forgot-password'
+      path: '/auth/forgot-password'
+      fullPath: '/auth/forgot-password'
+      preLoaderRoute: typeof PublicAuthForgotPasswordRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/auth/login': {
+      id: '/_public/auth/login'
+      path: '/auth/login'
+      fullPath: '/auth/login'
+      preLoaderRoute: typeof PublicAuthLoginRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/auth/reset-password': {
+      id: '/_public/auth/reset-password'
+      path: '/auth/reset-password'
+      fullPath: '/auth/reset-password'
+      preLoaderRoute: typeof PublicAuthResetPasswordRouteImport
+      parentRoute: typeof PublicRoute
+    }
     '/api/auth/$': {
       id: '/api/auth/$'
       path: '/api/auth/$'
@@ -65,11 +264,64 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiAuthSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_protected/catalog/$modelId/edit': {
+      id: '/_protected/catalog/$modelId/edit'
+      path: '/catalog/$modelId/edit'
+      fullPath: '/catalog/$modelId/edit'
+      preLoaderRoute: typeof ProtectedCatalogModelIdEditRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
+    '/_protected/catalog/review/': {
+      id: '/_protected/catalog/review/'
+      path: '/catalog/review'
+      fullPath: '/catalog/review/'
+      preLoaderRoute: typeof ProtectedCatalogReviewIndexRouteImport
+      parentRoute: typeof ProtectedRoute
+    }
   }
 }
 
+interface ProtectedRouteChildren {
+  ProtectedVerificationQueueRoute: typeof ProtectedVerificationQueueRoute
+  ProtectedAuditEntityIdRoute: typeof ProtectedAuditEntityIdRoute
+  ProtectedSettingsMembersRoute: typeof ProtectedSettingsMembersRoute
+  ProtectedCatalogIndexRoute: typeof ProtectedCatalogIndexRoute
+  ProtectedCatalogModelIdEditRoute: typeof ProtectedCatalogModelIdEditRoute
+  ProtectedCatalogReviewIndexRoute: typeof ProtectedCatalogReviewIndexRoute
+}
+
+const ProtectedRouteChildren: ProtectedRouteChildren = {
+  ProtectedVerificationQueueRoute: ProtectedVerificationQueueRoute,
+  ProtectedAuditEntityIdRoute: ProtectedAuditEntityIdRoute,
+  ProtectedSettingsMembersRoute: ProtectedSettingsMembersRoute,
+  ProtectedCatalogIndexRoute: ProtectedCatalogIndexRoute,
+  ProtectedCatalogModelIdEditRoute: ProtectedCatalogModelIdEditRoute,
+  ProtectedCatalogReviewIndexRoute: ProtectedCatalogReviewIndexRoute,
+}
+
+const ProtectedRouteWithChildren = ProtectedRoute._addFileChildren(
+  ProtectedRouteChildren,
+)
+
+interface PublicRouteChildren {
+  PublicAuthForgotPasswordRoute: typeof PublicAuthForgotPasswordRoute
+  PublicAuthLoginRoute: typeof PublicAuthLoginRoute
+  PublicAuthResetPasswordRoute: typeof PublicAuthResetPasswordRoute
+}
+
+const PublicRouteChildren: PublicRouteChildren = {
+  PublicAuthForgotPasswordRoute: PublicAuthForgotPasswordRoute,
+  PublicAuthLoginRoute: PublicAuthLoginRoute,
+  PublicAuthResetPasswordRoute: PublicAuthResetPasswordRoute,
+}
+
+const PublicRouteWithChildren =
+  PublicRoute._addFileChildren(PublicRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ProtectedRoute: ProtectedRouteWithChildren,
+  PublicRoute: PublicRouteWithChildren,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
 }
 export const routeTree = rootRouteImport

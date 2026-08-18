@@ -5,7 +5,6 @@ Shared Vite+ plugins for Windwise TanStack Start apps.
 `tanstackAppPlugins()` installs, in order:
 
 1. SSR runnable-environment workaround
-   ([TanStack Router #7218](https://github.com/TanStack/router/issues/7218))
 2. Any extra plugins you pass (for example PowerSync)
 3. Tailwind Vite
 4. TanStack Start

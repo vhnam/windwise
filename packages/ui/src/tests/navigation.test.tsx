@@ -13,6 +13,15 @@ import {
   BreadcrumbSeparator,
 } from '#/components/breadcrumb';
 import {
+  Pagination,
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '#/components/pagination';
+import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
@@ -107,6 +116,40 @@ describe('Tabs', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Two' }));
 
     expect(screen.getByText('Panel two')).toBeTruthy();
+  });
+});
+
+describe('Pagination', () => {
+  it('renders labeled navigation with active and adjacent links', () => {
+    render(
+      <Pagination>
+        <PaginationContent>
+          <PaginationItem>
+            <PaginationPrevious href="/page/1" />
+          </PaginationItem>
+          <PaginationItem>
+            <PaginationLink href="/page/1">1</PaginationLink>
+          </PaginationItem>
+          <PaginationItem>
+            <PaginationLink href="/page/2" isActive>
+              2
+            </PaginationLink>
+          </PaginationItem>
+          <PaginationItem>
+            <PaginationEllipsis />
+          </PaginationItem>
+          <PaginationItem>
+            <PaginationNext href="/page/3" />
+          </PaginationItem>
+        </PaginationContent>
+      </Pagination>,
+    );
+
+    expect(screen.getByRole('navigation', { name: 'pagination' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Go to previous page' }).getAttribute('href')).toBe('/page/1');
+    expect(screen.getByRole('button', { name: '2' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByText('More pages')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Go to next page' }).getAttribute('href')).toBe('/page/3');
   });
 });
 
