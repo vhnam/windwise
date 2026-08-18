@@ -11,10 +11,10 @@ Impact:
 - `patch`: CSS reset fix in `@windwise/ui` with no API change; env validation
   crash fix in `@windwise/consumer-application`.
 - `minor`: new Button/Input primitives in `@windwise/ui`; new helper export in
-  `@windwise/query`.
-- `major`: remove or rename a public export from `@windwise/ui` or
-  `@windwise/query`. On `0.y.z`, prefer `minor` unless the record explicitly
-  says `major`; `1.0.0` is a product decision.
+  `@windwise/query`; new write-path exports in `@windwise/db`.
+- `major`: remove or rename a public export from `@windwise/ui`,
+  `@windwise/query`, or `@windwise/db`. On `0.y.z`, prefer `minor` unless the
+  record explicitly says `major`; `1.0.0` is a product decision.
 
 Multiple pending records for one package: highest impact wins (`major` >
 `minor` > `patch`). New members must ship `"version": "0.1.0"` and
