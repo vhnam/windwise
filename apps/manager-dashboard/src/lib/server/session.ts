@@ -1,5 +1,5 @@
 import { getRequest } from '@tanstack/react-start/server';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 import type { Role } from '@windwise/schemas';
 
@@ -16,16 +16,33 @@ export async function getActorContext(): Promise<ActorContext | null> {
 
   const { getDb, organizationMembers } = await import('@windwise/db');
   const db = getDb();
+  const userId = session.user.id;
+  const activeOrganizationId = session.session.activeOrganizationId;
 
-  const [member] = await db
+  if (activeOrganizationId) {
+    const [member] = await db
+      .select({ organizationId: organizationMembers.organizationId, role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(and(eq(organizationMembers.userId, userId), eq(organizationMembers.organizationId, activeOrganizationId)))
+      .limit(1);
+
+    if (!member) {
+      return null;
+    }
+
+    return { userId, organizationId: member.organizationId, role: member.role };
+  }
+
+  const memberships = await db
     .select({ organizationId: organizationMembers.organizationId, role: organizationMembers.role })
     .from(organizationMembers)
-    .where(eq(organizationMembers.userId, session.user.id))
-    .limit(1);
+    .where(eq(organizationMembers.userId, userId))
+    .limit(2);
 
-  if (!member) {
+  const [onlyMembership] = memberships;
+  if (!onlyMembership || memberships.length !== 1) {
     return null;
   }
 
-  return { userId: session.user.id, organizationId: member.organizationId, role: member.role };
+  return { userId, organizationId: onlyMembership.organizationId, role: onlyMembership.role };
 }
