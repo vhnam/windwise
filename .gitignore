@@ -41,3 +41,26 @@ dist-ssr
 # Spec Kit and GitNexus under .claude/skills/ are repo-owned and stay committed.
 .agents/
 .claude/skills/ui-ux-pro-max
+# Matt Pocock skills (mattpocock/skills) — lockfile only; local install trees
+.claude/skills/ask-matt
+.claude/skills/code-review
+.claude/skills/codebase-design
+.claude/skills/diagnosing-bugs
+.claude/skills/domain-modeling
+.claude/skills/git-guardrails-claude-code
+.claude/skills/grill-me
+.claude/skills/grill-with-docs
+.claude/skills/grilling
+.claude/skills/handoff
+.claude/skills/implement
+.claude/skills/improve-codebase-architecture
+.claude/skills/prototype
+.claude/skills/research
+.claude/skills/resolving-merge-conflicts
+.claude/skills/setup-matt-pocock-skills
+.claude/skills/tdd
+.claude/skills/teach
+.claude/skills/to-questionnaire
+.claude/skills/wait-what
+.claude/skills/wizard
+.claude/skills/writing-for-agents
