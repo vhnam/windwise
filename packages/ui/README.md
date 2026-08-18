@@ -27,12 +27,13 @@ Workflow: [AGENTS.md](../../AGENTS.md).
 
 ## Extra (allowed, not required for done)
 
-These may stay in the package and must remain domain-free: avatar, chart,
-dropdown-menu, input-group, popover, questionnaire, sheet, sidebar, table,
-tooltip.
+These may stay in the package and must remain domain-free: attachment, avatar,
+chart, dropdown-menu, empty, input-group, pagination, popover, questionnaire,
+sheet, sidebar, table, tooltip.
 
 `questionnaire` is a generic multi-step control. It is not Windwise consultation
-UI.
+UI. `Empty` is a generic empty/denied layout; catalog copy stays in the
+dashboard.
 
 ## Forbidden in this package
 
@@ -43,8 +44,8 @@ and steps. Examples: `InstrumentCard`, `RecommendationCard`, `ConsultationStep`,
 ## Promotion
 
 Build a missing generic pattern in the owning app first. Promote it into this
-package only when both products need it and the name stays domain-free. Empty
-states stay app-local until then.
+package only when both products need it and the name stays domain-free. Domain
+empty copy stays in the app; compose `@windwise/ui/components/empty` there.
 
 ## Notice vs dialog
 
