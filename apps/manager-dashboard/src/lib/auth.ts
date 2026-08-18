@@ -29,6 +29,7 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    disableSignUp: true,
     sendResetPassword: async ({ user, url }) => {
       // No mailer is configured yet; log the reset URL so local/dev can complete the flow.
       console.info(`[auth] Password reset for ${user.email}: ${url}`);
