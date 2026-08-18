@@ -11,18 +11,22 @@ model (Owner/Admin/Editor/Reviewer/Viewer), with a verification queue for
 stale/incomplete/broken-source records and a same-transaction audit trail for
 every write. `@windwise/db` gains its first write path into the catalog tables
 (`createInstrumentModel`, `editInstrumentModel`, `transitionInstrumentModel`,
-`archiveInstrumentModel`, plus related price/image/source upserts,
+`archiveInstrumentModel`, plus related price/image/source upserts),
 `getVerificationQueue`, `getAuditTrail`, `getCatalogSettings`,
-`listOrganizationMembers`, `canTransition`) plus new `organization_members`,
-`audit_logs`, `catalog_settings`, and `comments` tables; Better Auth Drizzle
-tables (`user`, `session`, `account`, `verification`, `organization`, `member`,
-`invitation`) with UUID ids; and a local seed for the WindWise org owner
-(`admin@windwise.io`). `@windwise/schemas` gains
-`VerificationQueueItem`/`AuditTrailEntry`/`Role` shapes and shared catalog
-filter tuples. `@windwise/ui` adds generic `Attachment`, `Pagination`, and
+`updateCatalogSettings`, `listOrganizationMembers`,
+`updateOrganizationMemberRole`, `listComments`, `addComment`, and `auth/`
+helpers (`canTransition`, `required-fields`, `writeAuditEntry`); new
+`organization_members`, `audit_logs`, `catalog_settings`, and `comments` tables;
+Better Auth Drizzle tables (`user`, `session`, `account`, `verification`,
+`organization`, `member`, `invitation`) with UUID ids; a local seed for the
+WindWise org owner (`admin@windwise.io`); and a manual/cron `db:check-sources`
+entry point for `checkSourceLiveness`. `@windwise/schemas` gains
+`VerificationQueueItem` / `AuditTrailEntry` / `CommentListItem` / `Role` shapes,
+shared catalog filter tuples, and `WriteError` reasons including
+`invalid-input`. `@windwise/ui` adds generic `Attachment`, `Pagination`, and
 `Empty` primitives. `@windwise/manager-dashboard` gains its first real screens
-beyond the auth scaffold: sign-in / password reset (with Better Auth
-organization plugin + Drizzle adapter schema wiring), a paged catalog list,
-Formisch Content Manager editor, reviewer queue, verification queue, paginated
-audit history, and member role settings, with sticky page headers and role-gated
-empty states.
+beyond the auth scaffold: sign-in / password reset (Better Auth organization
+plugin + Drizzle adapter), a paged catalog list, Formisch Content Manager editor
+(comments with placeholder, admin restore from archive), reviewer queue,
+verification queue, paginated audit history, and member role / staleness
+settings, with sticky page headers and role-gated empty states.
