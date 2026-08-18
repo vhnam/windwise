@@ -32,9 +32,9 @@ export type CatalogSourceInput = {
 };
 
 export type CatalogRelatedInput = {
-  price?: CatalogPriceInput;
-  primaryImage?: CatalogImageInput;
-  source?: CatalogSourceInput;
+  price?: CatalogPriceInput | null;
+  primaryImage?: CatalogImageInput | null;
+  source?: CatalogSourceInput | null;
 };
 
 export type CreateInstrumentModelInput = {
@@ -120,13 +120,20 @@ function completenessFrom(
   };
 }
 
+function hasRelatedValue<T>(existing: { id: string } | undefined, next: T | null | undefined): boolean {
+  if (next === null) return false;
+  return Boolean(existing || next);
+}
+
 async function upsertRelated(
-  tx: Pick<Database, 'insert' | 'update'>,
+  tx: Pick<Database, 'insert' | 'update' | 'delete'>,
   modelId: string,
   existing: RelatedIds,
   input: CatalogRelatedInput,
 ) {
-  if (input.price) {
+  if (input.price === null && existing.currentPrice) {
+    await tx.delete(pricePoints).where(eq(pricePoints.id, existing.currentPrice.id));
+  } else if (input.price) {
     const values = {
       scope: input.price.scope,
       amountMin: String(input.price.amountMin),
@@ -140,7 +147,9 @@ async function upsertRelated(
     }
   }
 
-  if (input.primaryImage) {
+  if (input.primaryImage === null && existing.primaryImage) {
+    await tx.delete(modelImages).where(eq(modelImages.id, existing.primaryImage.id));
+  } else if (input.primaryImage) {
     const values = {
       url: input.primaryImage.url,
       altEn: input.primaryImage.altEn,
@@ -157,7 +166,9 @@ async function upsertRelated(
     }
   }
 
-  if (input.source) {
+  if (input.source === null && existing.source) {
+    await tx.delete(sources).where(eq(sources.id, existing.source.id));
+  } else if (input.source) {
     const values = {
       kind: input.source.kind,
       url: input.source.url,
@@ -222,9 +233,9 @@ export async function createInstrumentModel(
   };
 
   const completeness = completenessFrom(row, {
-    hasCurrentPrice: Boolean(input.price),
-    hasPrimaryImage: Boolean(input.primaryImage),
-    hasSource: Boolean(input.source),
+    hasCurrentPrice: hasRelatedValue(undefined, input.price),
+    hasPrimaryImage: hasRelatedValue(undefined, input.primaryImage),
+    hasSource: hasRelatedValue(undefined, input.source),
   });
   row.dataCompleteness = completeness.dataCompleteness;
 
@@ -263,9 +274,9 @@ export async function editInstrumentModel(
   const { price, primaryImage, source, ...modelPatch } = patch;
   const after = { ...current, ...modelPatch, version: current.version + 1 };
   const completeness = completenessFrom(after, {
-    hasCurrentPrice: Boolean(related.currentPrice || price),
-    hasPrimaryImage: Boolean(related.primaryImage || primaryImage),
-    hasSource: Boolean(related.source || source),
+    hasCurrentPrice: hasRelatedValue(related.currentPrice, price),
+    hasPrimaryImage: hasRelatedValue(related.primaryImage, primaryImage),
+    hasSource: hasRelatedValue(related.source, source),
   });
   after.dataCompleteness = completeness.dataCompleteness;
 

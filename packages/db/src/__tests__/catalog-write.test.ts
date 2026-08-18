@@ -99,6 +99,24 @@ describe('editInstrumentModel', () => {
     expect(result.ok).toBe(true);
     expect(inserted).toHaveLength(4);
   });
+
+  it('deletes existing price, image, and source rows when they are cleared with null', async () => {
+    const { db, deleted, inserted } = createFakeWriteDb([
+      [{ role: 'editor' }],
+      [MODEL_ROW],
+      [{ id: 'price-1' }],
+      [{ id: 'image-1' }],
+      [{ id: 'source-1' }],
+    ]);
+    const result = await editInstrumentModel(db, 'user-1', 'org-1', 'model-1', 1, {
+      price: null,
+      primaryImage: null,
+      source: null,
+    });
+    expect(result.ok).toBe(true);
+    expect(deleted).toHaveLength(3);
+    expect(inserted).toHaveLength(1);
+  });
 });
 
 describe('transitionInstrumentModel', () => {
