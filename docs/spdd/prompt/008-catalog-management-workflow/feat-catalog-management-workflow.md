@@ -470,6 +470,20 @@ Conservative-constraint notes:
    archive" of the record itself, not comment threads); any role that can view a
    record can add a comment per FR-008.
 
+### Create Query - `packages/db/src/queries/comments.ts`
+
+1. Responsibility: List and add `Comment` rows for a catalog record (FR-008 /
+   US3.1) — the schema alone is not enough; this is the write/read path.
+2. Signatures: `listComments(db, modelId): Promise<CommentListItem[]>`;
+   `addComment(db, actorUserId, orgId, modelId, body): Promise<WriteResult<CommentListItem>>`.
+3. Logic: `listComments` joins `authorUserId` to better-auth `user` for
+   `authorDisplayName`, ordered by `createdAt` ascending. `addComment` re-reads
+   org membership for `actorUserId`/`orgId`; any member role may insert; empty /
+   whitespace-only `body` is rejected; no call to `canTransition` or
+   `writeAuditEntry`.
+4. Constraints: Do not audit comments under FR-010. Do not accept a client-
+   supplied role. `CommentListItem` lives in `@windwise/schemas`.
+
 ### Create Function - `packages/db/src/authz/can-transition.ts`
 
 1. Responsibility: Single shared lifecycle/role check (research.md §2); every
@@ -589,10 +603,14 @@ Conservative-constraint notes:
    dashboard page load. Wire it as a scheduled task per whatever job-running
    convention the platform later adopts — if none exists yet, implement as an
    invokable function with a documented manual/cron trigger, not inline in
-   `verification-queue.ts`. Include basic retry/backoff (research.md §4 risk:
-   false positives from transient failures) — do not flag a source broken from a
-   single failed attempt; require the check to fail twice consecutively before
-   flipping `source_ok` to `false`.
+   `verification-queue.ts`. Ship
+   `packages/db/src/jobs/check-source-liveness-cli.ts` and a `db:check-sources`
+   package script (`vp -C packages/db run db:check-sources`) as the manual/cron
+   entry point; document the command in
+   `docs/specs/008-catalog-management-workflow/quickstart.md`. Include basic
+   retry/backoff (research.md §4 risk: false positives from transient failures)
+   — do not flag a source broken from a single failed attempt; require the check
+   to fail twice consecutively before flipping `source_ok` to `false`.
 
 ### Create Query - `packages/db/src/queries/audit-trail.ts`
 
@@ -708,11 +726,16 @@ Conservative-constraint notes:
      Source.
    - Aside: Information (status, entry id, version, last verified, completeness,
      review notes, link to `/audit/$entityId`); Archive for `published` records
-     behind a confirm dialog.
+     behind a confirm dialog; Restore for `archived` records (admin+ only,
+     `archived → draft`) behind a confirm dialog — restore calls
+     `transitionStatusFn` directly and must not require a successful form save
+     first.
+   - Main column (saved records only): Comments card — chronological list plus a
+     body field any org member can submit via `addCommentFn` (FR-008/US3.1).
 3. Logic: `@formisch/react` `useForm` + `CatalogEditSchema`; submit calls
    `useCatalogEditActions().submitSave`; workflow buttons call
-   `handleTransition`. After failed submit, move focus to the error summary (do
-   not replace inline `FieldError`s).
+   `handleTransition`; Restore calls `handleRestore`. After failed submit, move
+   focus to the error summary (do not replace inline `FieldError`s).
 4. Constraints: Zustand is not used. Do not put catalog-specific composites in
    `@windwise/ui`.
 
