@@ -1,3 +1,8 @@
+/**
+ * Periodic (not per-page-load) source URL liveness check.
+ * Invoke via `vp -C packages/db run db:check-sources` or an equivalent cron —
+ * never from a verification-queue page load.
+ */
 import { eq, inArray } from 'drizzle-orm';
 
 import type { Database } from '#/client.ts';

@@ -86,6 +86,24 @@ shapes.
    change is not silently discarded or silently applied over Session A's
    (research.md §5, spec Edge Cases).
 
+## Scenario 9 — Source liveness is refreshed off the request path
+
+1. Ensure the dashboard is **not** used to probe source URLs.
+2. From the repo root, run the manual/cron entry point:
+
+   ```bash
+   vp -C packages/db run db:check-sources
+   ```
+
+   Optionally limit the run with `SOURCE_IDS=uuid1,uuid2`.
+
+3. **Expect**: each checked `sources` row updates `source_ok` /
+   `last_checked_at` without loading `/verification-queue`. Transient failures
+   require two consecutive misses before `source_ok` becomes `false`
+   (research.md §4).
+4. Reload the verification queue — broken-source reasons reflect the refreshed
+   flags only.
+
 ## Success criteria mapped
 
 | Quickstart scenario | Spec success criterion                                     |
@@ -94,3 +112,4 @@ shapes.
 | 4                   | SC-002 (100% of flagged records surfaced)                  |
 | 5, 6                | SC-004 (100% role-restricted actions denied)               |
 | 7                   | SC-003 (every change audited with a complete diff)         |
+| 9                   | FR-005 broken-source detection stays off the page path     |
