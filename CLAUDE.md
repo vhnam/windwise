@@ -22,8 +22,8 @@ Spec Kit stops after `/speckit-plan` unless the user explicitly asks for
 
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **windwise** (3368 symbols, 6278
-relationships, 170 execution flows). Use the GitNexus MCP tools to understand
+This project is indexed by GitNexus as **windwise** (3388 symbols, 6361
+relationships, 171 execution flows). Use the GitNexus MCP tools to understand
 code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it
