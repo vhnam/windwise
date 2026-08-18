@@ -18,6 +18,11 @@ export const listCatalogRecordsFn = createServerFn({ method: 'GET' })
     }),
   )
   .handler(async ({ data }) => {
+    const actor = await getActorContext();
+    if (!actor) {
+      return { items: [], totalCount: 0, page: data.page ?? 1, pageSize: data.pageSize ?? 20 };
+    }
+
     const { getDb, instrumentModels } = await import('@windwise/db');
     const { asc, count, eq } = await import('drizzle-orm');
     const db = getDb();
@@ -43,6 +48,9 @@ export const listCatalogRecordsFn = createServerFn({ method: 'GET' })
 export const getInstrumentRecordFn = createServerFn({ method: 'GET' })
   .validator(v.object({ modelId: v.string() }))
   .handler(async ({ data }) => {
+    const actor = await getActorContext();
+    if (!actor) return null;
+
     const { getDb, instrumentModels, modelImages, pricePoints, sources } = await import('@windwise/db');
     const db = getDb();
     const [row] = await db.select().from(instrumentModels).where(eq(instrumentModels.id, data.modelId)).limit(1);
@@ -64,12 +72,18 @@ export const getInstrumentRecordFn = createServerFn({ method: 'GET' })
   });
 
 export const listBrandsFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const actor = await getActorContext();
+  if (!actor) return [];
+
   const { getDb, brands } = await import('@windwise/db');
   const { asc } = await import('drizzle-orm');
   return getDb().select({ id: brands.id, name: brands.name }).from(brands).orderBy(asc(brands.name));
 });
 
 export const listFamiliesFn = createServerFn({ method: 'GET' }).handler(async () => {
+  const actor = await getActorContext();
+  if (!actor) return [];
+
   const { getDb, instrumentFamilies } = await import('@windwise/db');
   const { asc } = await import('drizzle-orm');
   return getDb()
@@ -105,9 +119,9 @@ const CatalogSourceInputSchema = v.object({
 });
 
 const CatalogRelatedInputSchema = {
-  price: v.optional(CatalogPriceInputSchema),
-  primaryImage: v.optional(CatalogImageInputSchema),
-  source: v.optional(CatalogSourceInputSchema),
+  price: v.optional(v.nullable(CatalogPriceInputSchema)),
+  primaryImage: v.optional(v.nullable(CatalogImageInputSchema)),
+  source: v.optional(v.nullable(CatalogSourceInputSchema)),
 };
 
 export const createInstrumentRecordFn = createServerFn({ method: 'POST' })
@@ -218,6 +232,9 @@ export const getVerificationQueueFn = createServerFn({ method: 'GET' }).handler(
 export const getAuditTrailFn = createServerFn({ method: 'GET' })
   .validator(v.object({ entity: v.string(), entityId: v.string() }))
   .handler(async ({ data }) => {
+    const actor = await getActorContext();
+    if (!actor) return { entries: [] };
+
     const { getDb, getAuditTrail } = await import('@windwise/db');
     const entries = await getAuditTrail(getDb(), data.entity, data.entityId);
     return { entries };
