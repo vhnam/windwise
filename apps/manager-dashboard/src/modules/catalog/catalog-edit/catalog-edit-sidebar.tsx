@@ -19,7 +19,9 @@ import type { useCatalogEditActions } from './catalog-edit.actions';
 type CatalogEditSidebarProps = {
   record: ReturnType<typeof useCatalogEditActions>['record'];
   isSubmitting: boolean;
+  canRestore: boolean;
   onTransition: (targetStatus: 'in_review' | 'published' | 'draft' | 'archived') => void;
+  onRestore: () => void;
 };
 
 function formatTimestamp(value: Date | string | null | undefined) {
@@ -42,8 +44,15 @@ function InfoRow({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-export function CatalogEditSidebar({ record, isSubmitting, onTransition }: CatalogEditSidebarProps) {
+export function CatalogEditSidebar({
+  record,
+  isSubmitting,
+  canRestore,
+  onTransition,
+  onRestore,
+}: CatalogEditSidebarProps) {
   const [archiveOpen, setArchiveOpen] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
 
   return (
     <div className="space-y-4 lg:space-y-6 lg:sticky lg:top-16">
@@ -107,6 +116,25 @@ export function CatalogEditSidebar({ record, isSubmitting, onTransition }: Catal
         </Card>
       ) : null}
 
+      {canRestore ? (
+        <Card>
+          <CardHeader className="border-b">
+            <CardTitle>Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="py-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              disabled={isSubmitting}
+              onClick={() => setRestoreOpen(true)}
+            >
+              Restore to draft
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <Dialog open={archiveOpen} onOpenChange={setArchiveOpen}>
         <DialogContent>
           <DialogHeader>
@@ -126,6 +154,29 @@ export function CatalogEditSidebar({ record, isSubmitting, onTransition }: Catal
               }}
             >
               Archive
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={restoreOpen} onOpenChange={setRestoreOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Restore this record?</DialogTitle>
+            <DialogDescription>
+              It will return to draft so editors can update it before sending it through review again.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose render={<Button type="button" variant="outline" />}>Cancel</DialogClose>
+            <Button
+              type="button"
+              onClick={() => {
+                setRestoreOpen(false);
+                onRestore();
+              }}
+            >
+              Restore to draft
             </Button>
           </DialogFooter>
         </DialogContent>

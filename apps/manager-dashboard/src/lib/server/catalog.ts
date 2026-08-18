@@ -222,3 +222,34 @@ export const getAuditTrailFn = createServerFn({ method: 'GET' })
     const entries = await getAuditTrail(getDb(), data.entity, data.entityId);
     return { entries };
   });
+
+export const listCommentsFn = createServerFn({ method: 'GET' })
+  .validator(v.object({ modelId: v.string() }))
+  .handler(async ({ data }) => {
+    const actor = await getActorContext();
+    if (!actor) return { items: [] };
+
+    const { getDb, listComments } = await import('@windwise/db');
+    const items = await listComments(getDb(), data.modelId);
+    return { items };
+  });
+
+export const addCommentFn = createServerFn({ method: 'POST' })
+  .validator(
+    v.object({
+      modelId: v.string(),
+      body: v.pipe(v.string(), v.trim(), v.minLength(1)),
+    }),
+  )
+  .handler(async ({ data }) => {
+    const actor = await getActorContext();
+    if (!actor) return UNAUTHENTICATED;
+
+    const { getDb, addComment } = await import('@windwise/db');
+    const result = await addComment(getDb(), actor.userId, actor.organizationId, data.modelId, data.body);
+    if (!result.ok) {
+      if (result.reason === 'invalid-input') return { error: 'INVALID_INPUT' } as const;
+      return FORBIDDEN;
+    }
+    return { status: 'ok', comment: result.value } as const;
+  });

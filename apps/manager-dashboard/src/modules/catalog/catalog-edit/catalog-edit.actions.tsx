@@ -4,6 +4,8 @@ import { useState } from 'react';
 
 import { toast } from '@windwise/ui/components/toast';
 
+import { hasMinRole } from '#/lib/roles';
+import { getActorContextFn } from '#/lib/server/actor';
 import { createInstrumentRecordFn, editInstrumentRecordFn, transitionStatusFn } from '#/lib/server/catalog';
 import { getBrandsQueryOptions } from '#/queries/brand';
 import { getFamiliesQueryOptions } from '#/queries/family';
@@ -58,10 +60,17 @@ export const useCatalogEditActions = () => {
   const { modelId } = catalogEditRoute.useParams();
   const router = useRouter();
   const isNew = modelId === 'new';
+  const actorQuery = useQuery({
+    queryKey: ['actor-context'],
+    queryFn: () => getActorContextFn(),
+  });
   const brandsQuery = useQuery(getBrandsQueryOptions());
   const familiesQuery = useQuery(getFamiliesQueryOptions());
   const [actionError, setActionError] = useState<string | null>(null);
   const [missingFields, setMissingFields] = useState<string[]>([]);
+  const [isRestoring, setIsRestoring] = useState(false);
+
+  const canRestore = Boolean(record?.status === 'archived' && hasMinRole(actorQuery.data?.role, 'admin'));
 
   const submitSave = async (payload: CatalogEditSchemaType, options?: { announce?: boolean }) => {
     const announce = options?.announce ?? true;
@@ -156,6 +165,33 @@ export const useCatalogEditActions = () => {
     void router.invalidate();
   };
 
+  const handleRestore = async () => {
+    if (!record || record.status !== 'archived') return;
+
+    setActionError(null);
+    setMissingFields([]);
+    setIsRestoring(true);
+    try {
+      const result = await transitionStatusFn({
+        data: { modelId, expectedVersion: record.version, targetStatus: 'draft' },
+      });
+      if ('error' in result && result.error === 'CONFLICT') {
+        throw new Error('Someone else edited this record. Reload to see the latest version.');
+      }
+      if ('error' in result) {
+        setActionError('That transition is not allowed for your role.');
+        return;
+      }
+      toast.add({
+        type: 'success',
+        title: `Now ${STATUS_LABEL[result.newStatus]}`,
+      });
+      void router.invalidate();
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   return {
     record,
     isNew,
@@ -167,7 +203,10 @@ export const useCatalogEditActions = () => {
     isFamiliesPending: familiesQuery.isPending && !familiesQuery.data,
     isBrandsError: brandsQuery.isError,
     isFamiliesError: familiesQuery.isError,
+    canRestore,
+    isRestoring,
     submitSave,
     handleTransition,
+    handleRestore,
   };
 };

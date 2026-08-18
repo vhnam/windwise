@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react';
 import { CatalogEditSchema } from '#/schemas/catalog-edit.schema';
 import { fieldErrorMessage } from '#/utils/auth';
 
+import { CatalogEditComments } from './catalog-edit-comments';
 import { CatalogEditErrors } from './catalog-edit-errors';
 import { CatalogEditHeader } from './catalog-edit-header';
 import { CatalogEditIdentity } from './catalog-edit-identity';
@@ -25,8 +26,11 @@ function CatalogEdit() {
     isFamiliesPending,
     isBrandsError,
     isFamiliesError,
+    canRestore,
+    isRestoring,
     submitSave,
     handleTransition,
+    handleRestore,
   } = useCatalogEditActions();
   const errorSummaryRef = useRef<HTMLDivElement>(null);
 
@@ -49,7 +53,7 @@ function CatalogEdit() {
     },
   });
 
-  const isSubmitting = catalogEditForm.isSubmitting;
+  const isSubmitting = catalogEditForm.isSubmitting || isRestoring;
   const formError = fieldErrorMessage(catalogEditForm.errors);
   const errorEntries =
     catalogEditForm.isSubmitted && !catalogEditForm.isValid ? getDeepErrorEntries(catalogEditForm) : [];
@@ -97,9 +101,18 @@ function CatalogEdit() {
             <CatalogEditPricing form={catalogEditForm} disabled={isSubmitting} />
             <CatalogEditImage form={catalogEditForm} disabled={isSubmitting} />
             <CatalogEditSource form={catalogEditForm} disabled={isSubmitting} />
+            <CatalogEditComments />
           </div>
 
-          <CatalogEditSidebar record={record} isSubmitting={isSubmitting} onTransition={onTransition} />
+          <CatalogEditSidebar
+            record={record}
+            isSubmitting={isSubmitting}
+            canRestore={canRestore}
+            onTransition={onTransition}
+            onRestore={() => {
+              void handleRestore();
+            }}
+          />
         </div>
       </Form>
     </div>
