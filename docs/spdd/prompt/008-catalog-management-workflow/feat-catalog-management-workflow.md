@@ -179,6 +179,13 @@ class CanTransition {
     +check(actorRole, currentStatus, targetStatus) boolean
 }
 
+class ActorContext {
+    <<in-memory>>
+    +string userId
+    +string organizationId
+    +Role role
+}
+
 Organization "1" --> "1..*" OrganizationMember : has members
 OrganizationMember "1" --> "1" Role : assigned
 Organization "1" --> "1" CatalogSettings : configures
@@ -192,6 +199,9 @@ InstrumentModel "1" --> "0..*" Comment : accumulates
 InstrumentModel "1" --> "0..*" AuditLog : audited by
 CanTransition --> OrganizationMember : reads current role
 CanTransition --> InstrumentModel : validates status change
+ActorContext --> Organization : active organization
+ActorContext --> OrganizationMember : membership
+ActorContext --> Role : role
 VerificationQueueItem --> InstrumentModel : summarizes
 VerificationQueueItem "1" --> "1..*" QueueReason : flags
 ```
@@ -231,17 +241,25 @@ Conservative-constraint notes:
   `broken_source` carries `sourceUrl` and `lastCheckedAt` — not a database enum.
 - `CanTransition` is a function, not a table — represented here to make the
   centralized-check architecture explicit in the entity graph.
+- `ActorContext` is in-memory
+  (`apps/manager-dashboard/src/lib/server/session.ts`), never a Drizzle table or
+  `@windwise/schemas` shape. `getActorContext()` builds
+  `{ userId, organizationId, role }` from the Better Auth session plus a fresh
+  `organization_members` read: `session.activeOrganizationId` when set,
+  otherwise the user's unique membership. A session with no member row is not an
+  actor (`null`).
 
 ## Approach
 
 1. **Roles via better-auth organization plugin, not a custom table**: Add the
-   `organization` plugin to `apps/manager-dashboard/src/lib/auth.ts` (currently
-   configured with only `emailAndPassword` + `tanstackStartCookies()` and no
-   database adapter at all), extend its `member.role` field to the five-value
-   enum (`owner | admin | editor | reviewer | viewer`) via the plugin's
-   `additionalFields` mechanism. Do not build a parallel `organization_members`
-   table — the plugin already models org → member → role and 008's spec role set
-   maps directly onto it.
+   `organization` plugin to `apps/manager-dashboard/src/lib/auth.ts` (wired with
+   `emailAndPassword` + `disableSignUp: true`, `tanstackStartCookies()`, and the
+   Drizzle adapter on `getDb()`), extend its `member.role` field to the
+   five-value enum (`owner | admin | editor | reviewer | viewer`) via the
+   plugin's `additionalFields` mechanism. Do not build a parallel
+   `organization_members` table — the plugin already models org → member → role
+   and 008's spec role set maps directly onto it. Public email sign-up is
+   closed; staff accounts are seeded or invited, not self-registered.
 
 2. **One centralized lifecycle/role check, `can-transition.ts`**: Every server
    function that creates, edits, transitions, or archives a catalog record calls
@@ -250,6 +268,11 @@ Conservative-constraint notes:
    Review→Published→Archived rules inline. This is what makes FR-012 ("current
    role, every time") true by construction — the function re-reads the member
    row at call time, never trusts a cached/session-start role.
+   `getActorContext()` selects that row by `session.activeOrganizationId` when
+   set; if it is unset, it continues only when the user has exactly one
+   membership (never `.limit(1)` across multiple orgs). Catalog and audit
+   **reads** also require a non-null actor — a signed-in user with no member row
+   must not load records, brands, families, or audit history.
 
 3. **Same-transaction audit writes, no async/queued logging**:
    `catalog-write.ts` mutation functions wrap the record mutation and a call to
@@ -324,7 +347,11 @@ Conservative-constraint notes:
 ### Type Relationships
 
 - `OrganizationMember.role` is the single source of truth `can-transition.ts`
-  reads; nothing else stores a duplicate/cached role.
+  reads; nothing else stores a duplicate/cached role. Dashboard server functions
+  receive that role via in-memory `ActorContext` (`getActorContext` in
+  `session.ts`): `organizationId` is `session.activeOrganizationId` when
+  present, otherwise the user's unique membership — never an arbitrary first
+  `member` row.
 - `InstrumentModel.status` is the single lifecycle field; `PricePoint`,
   `ModelImage`, `Source` are children scoped by `modelId` and do not carry their
   own independent status.
@@ -374,9 +401,11 @@ Conservative-constraint notes:
    (`catalog-list`, `catalog-edit`, `catalog-review`, `catalog-verification`,
    `catalog-audit`) and `src/modules/settings/members-settings/`. Client role
    gates use `hasMinRole` (`src/lib/roles.ts`); actor context is loaded via
-   `getActorContextFn` (`src/lib/server/actor.ts`). Modules call server
-   functions / query options only; never import Drizzle or touch `@windwise/db`
-   internals directly.
+   `getActorContextFn` (`src/lib/server/actor.ts`), which wraps
+   `getActorContext()` in `src/lib/server/session.ts`. Catalog/audit server
+   functions live in `src/lib/server/catalog.ts` and require that actor on reads
+   and writes. Modules call server functions / query options only; never import
+   Drizzle or touch `@windwise/db` internals directly.
 2. **Service layer** (`packages/db/src/authz/`, `packages/db/src/queries/`):
    `can-transition.ts`, `catalog-write.ts`, `verification-queue.ts`,
    `audit-trail.ts`, `required-fields.ts`, `catalog-settings.ts`,
@@ -539,7 +568,11 @@ Conservative-constraint notes:
      concurrency, research.md §5); recomputes `dataCompleteness`; computes the
      diff of changed fields; writes the row (incrementing `version`) and an
      `edit` audit entry in one transaction. `patch` may never include `status` —
-     status only changes through `transitionInstrumentModel`.
+     status only changes through `transitionInstrumentModel`. Related fields on
+     `CatalogRelatedInput` (`price`, `primaryImage`, `source`) are tri-state:
+     omit/`undefined` leaves the existing row; an object upserts; `null` deletes
+     the current price, primary image, or source so a cleared editor field does
+     not leave a stale row.
    - `transitionInstrumentModel(actorUserId, orgId, modelId, expectedVersion, targetStatus, note?): Promise<InstrumentModel>`
      — reads current role and current status fresh; calls `canTransition`; if
      target is `published`, calls `computeMissingFields` and rejects with the
@@ -651,6 +684,34 @@ Conservative-constraint notes:
 4. Constraints: This is a query over the same physical members table the
    organization plugin manages — not a second membership store.
 
+### Create Helper - `apps/manager-dashboard/src/lib/server/session.ts`
+
+1. Responsibility: Resolve the caller's `ActorContext` (`userId`,
+   `organizationId`, `role`) from the Better Auth session plus a fresh
+   `organization_members` read (FR-012).
+2. Signature: `getActorContext(): Promise<ActorContext | null>`.
+3. Logic: `auth.api.getSession` from request headers; no user → `null`. If
+   `session.activeOrganizationId` is set, look up that membership for the user
+   and return `null` when it is missing. If it is unset, load at most two
+   memberships; continue only when there is exactly one.
+4. Constraints: Do not pick `.limit(1)` across orgs. Do not trust a
+   client-supplied role or organization id. A session without a member row is
+   not an actor.
+
+### Create Server Function - `apps/manager-dashboard/src/lib/server/catalog.ts`
+
+1. Responsibility: TanStack Start server functions for catalog list/get, brand
+   and family options, create/edit/transition, verification queue, audit trail,
+   and comments.
+2. Logic: Every handler calls `getActorContext()` first. Unauthenticated or
+   non-member callers: list/get/brands/families/audit/comments-list return empty
+   or `null` (same pattern as `getVerificationQueueFn` / `listCommentsFn`);
+   mutations return `{ error: 'FORBIDDEN' }`. Related create/edit payloads
+   accept `price` / `primaryImage` / `source` as optional nullable objects
+   (`undefined` omit, `null` clear, object upsert).
+3. Constraints: Do not skip the actor check on read paths. Do not return catalog
+   or audit rows to a signed-in user who is not an organization member.
+
 ### Create Helper - `apps/manager-dashboard/src/lib/roles.ts`
 
 1. Responsibility: Client-side minimum-role comparison for hiding controls
@@ -670,17 +731,19 @@ Conservative-constraint notes:
 
 1. Responsibility: Configure better-auth's organization plugin with the
    five-role enum (Approach §1).
-2. Logic: Add `organization({ ... })` to the `plugins` array alongside the
-   existing `tanstackStartCookies()`; configure `additionalFields.role` on the
-   member schema to reference the Drizzle `roleEnum`; wire the `database`
-   adapter to `@windwise/db`'s existing Drizzle instance (`getDb()` from
-   `packages/db/src/client.ts`) — `auth.ts` currently has **no database adapter
-   configured at all**, so this is the first time `apps/manager-dashboard`'s
-   auth layer connects to Postgres, not an extension of an existing DB-backed
-   config.
+2. Logic: Keep `organization({ ... })` in the `plugins` array alongside
+   `tanstackStartCookies()`; `additionalFields.role` on the member schema
+   matches the Drizzle `roleEnum`. The `database` adapter is
+   `drizzleAdapter(getDb(), { provider: 'pg', schema: { user, session, account, verification, organization, member, invitation } })`
+   with `advanced.database.generateId: 'uuid'`. `emailAndPassword.enabled` stays
+   true with `disableSignUp: true` and a console-logged password-reset URL until
+   a mailer exists.
 3. Constraints: Do not remove `emailAndPassword` or `tanstackStartCookies()` —
    those are out of scope (spec Assumptions: "account creation/authentication
-   mechanics themselves are out of scope").
+   mechanics themselves are out of scope"). Keep
+   `emailAndPassword.disableSignUp: true` so `/api/auth/sign-up/email` cannot
+   mint a manager-dashboard session; seed (`admin@windwise.io`) and invitation
+   remain the account-creation paths.
 
 ### Create Route - `apps/manager-dashboard/src/routes/_protected/catalog/index.tsx`
 
@@ -743,9 +806,12 @@ Conservative-constraint notes:
 
 1. Responsibility: Server-function wiring for create, edit, and status
    transition from the editor.
-2. Logic: `submitSave` maps form values through `toRelatedInput` (optional
-   `price`, `primaryImage`, `source`) then `createInstrumentRecordFn` /
-   `editInstrumentRecordFn` with `expectedVersion`; conflict surfaces
+2. Logic: `submitSave` maps form values through `toRelatedInput` then
+   `createInstrumentRecordFn` / `editInstrumentRecordFn` with `expectedVersion`.
+   `toRelatedInput` returns an object or `null` for each of `price`,
+   `primaryImage`, and `source` (never omits a key when the editor cleared the
+   field — `null` is what `editInstrumentModel` uses to delete the related row).
+   Conflict surfaces
    `Someone else edited this record. Reload to see the latest version.`;
    `handleTransition` calls `transitionStatusFn` and on
    `MISSING_REQUIRED_FIELDS` sets `missingFields` plus
@@ -875,7 +941,9 @@ Conservative-constraint notes:
    transition/archive) produces exactly one corresponding `audit_logs` row with
    correct before/after; concurrent edit with a stale `expectedVersion` is
    rejected with a conflict error, not silently applied; revoked-role save
-   attempt (actor's role changed between session start and save) is denied.
+   attempt (actor's role changed between session start and save) is denied;
+   `editInstrumentModel` with `price` / `primaryImage` / `source` set to `null`
+   deletes the existing related rows rather than leaving them in place.
 3. Framework: `vite-plus/test`, following the same DB-test setup convention
    `packages/db`'s existing tests (e.g. `list-published-instruments`'s query
    coverage) already use — inspect before inventing a new one.
@@ -951,7 +1019,9 @@ Conservative-constraint notes:
    error state, which renders role-appropriate messaging. Do not use Java-style
    global exception handler middleware; this is a TS/Node/React stack with typed
    return-value error handling at the service-function boundary, matching the
-   platform plan's stated approach elsewhere in the monorepo.
+   platform plan's stated approach elsewhere in the monorepo. Catalog related
+   writes distinguish omit vs `null` vs object; do not treat a missing key as
+   "delete the related row."
 6. **Formatting/linting**: oxfmt/oxlint via `vp check`; no additional lint
    config invented for this work item.
 7. **No domain leakage into `@windwise/ui`**: Catalog/audit/verification-queue
@@ -996,10 +1066,15 @@ Conservative-constraint notes:
    for this codebase.
 3. **Security**: Every catalog mutation re-reads the actor's role from the
    database at call time — no role read from a client-supplied or session-cached
-   claim is ever trusted for an authorization decision (FR-012). Audit log rows
-   are append-only from application code — no update/delete function is exposed
-   for `audit_logs`; tamper-resistance is enforced by never writing an update
-   path, not by database-level permissions this spec doesn't scope in.
+   claim is ever trusted for an authorization decision (FR-012).
+   `getActorContext` must use `session.activeOrganizationId` (or a unique
+   membership), not an arbitrary first member row. Catalog and audit **read**
+   server functions require the same actor; a session without org membership
+   must not load records, brands, families, or audit history. Public email
+   sign-up is disabled (`disableSignUp: true`). Audit log rows are append-only
+   from application code — no update/delete function is exposed for
+   `audit_logs`; tamper-resistance is enforced by never writing an update path,
+   not by database-level permissions this spec doesn't scope in.
 4. **Integration**: This is the foundation 005/006/007/009 depend on — do not
    change the shape of already-established read queries those specs use
    (`list-published-instruments.ts`, `get-instrument-detail.ts`,
@@ -1037,7 +1112,9 @@ Conservative-constraint notes:
 8. **API constraints**: Every catalog-mutating server function accepts and
    validates `expectedVersion`; every function reads role fresh, never accepts a
    role parameter from the client. `getVerificationQueue` and `getAuditTrail`
-   are read-only — no mutation branch inside either.
+   are read-only — no mutation branch inside either. Related catalog fields use
+   omit/`undefined` (leave), `null` (delete), object (upsert). `getAuditTrailFn`
+   and catalog list/get/brand/family handlers require `getActorContext()`.
 9. **Verification gate**: `vp -C packages/db test` and
    `vp -C apps/manager-dashboard test` must pass; `vp run ready` is the
    workspace gate for this work item's touched files (schema, authz, queries,
