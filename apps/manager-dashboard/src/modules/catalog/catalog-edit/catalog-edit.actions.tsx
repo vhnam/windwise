@@ -23,7 +23,7 @@ const toRelatedInput = (payload: CatalogEditSchemaType) => {
           amountMin,
           amountMax: Number.isFinite(amountMax) ? amountMax : amountMin,
         }
-      : undefined;
+      : null;
   const primaryImage =
     payload.imageUrl && payload.imageAltEn
       ? {
@@ -31,7 +31,7 @@ const toRelatedInput = (payload: CatalogEditSchemaType) => {
           altEn: payload.imageAltEn,
           credit: payload.imageCredit || 'Catalog editor',
         }
-      : undefined;
+      : null;
   const source =
     payload.sourceKind && payload.sourceUrl && payload.sourcePublisher
       ? {
@@ -39,7 +39,7 @@ const toRelatedInput = (payload: CatalogEditSchemaType) => {
           url: payload.sourceUrl,
           publisher: payload.sourcePublisher,
         }
-      : undefined;
+      : null;
 
   return { price, primaryImage, source };
 };
